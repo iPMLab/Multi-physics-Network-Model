@@ -1,4 +1,4 @@
-# About Multi-physics-Network-Model (MpNM)
+# About Multi physics Network Model (MpNM)
 MpNM is a network model framework for simulating multi-physics processes (e.g. flow and heat) in porous media written in Python, which is developed by Zhejiang University and Imperial College London. This model can utilize is compatible with the pore network extraction algorithm developed by Imperial College London (https://github.com/ImperialCollegeLondon/pnextract). One of the major improvements in MpNM is to couple two networks (e.g. pore network and solid network dual-network model) to simulated couple mass and heat transfer in both pore space and solid phase. The source code is being prepared into different modules and will be uploaded continuously with the example datasets for demonstration.
 
 
