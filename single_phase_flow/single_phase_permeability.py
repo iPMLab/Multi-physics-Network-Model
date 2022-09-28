@@ -6,9 +6,9 @@ Created on Tue Apr 26 21:22:24 2022
 @author: htmt
 """
 
-from Genpnm._network import network
-from Genpnm._topotools import topotools
-from Genpnm._algorithm import algorithm
+from MpNM._network import network
+from MpNM._topotools import topotools
+from MpNM._algorithm import algorithm
 import numpy as np
 import argparse  
 import time
