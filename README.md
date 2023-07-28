@@ -12,3 +12,8 @@ python single_phase_permeability.py
 ## Example 2 (Being prepared and will be uploaded soon)
 This example is to simulate heat and mass transfer using a dual-network.
 
+# Contact
+Please contact us if you need more demos or information:
+
+Qingyang Lin - qingyan_lin@zju.edu.cn
+Mingliang Qu - mingliangqu@zju.edu.cn
