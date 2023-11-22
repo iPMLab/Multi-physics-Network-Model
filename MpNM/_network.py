@@ -17,8 +17,8 @@ class network(Base):
             first_line = f.readline()
         f.close()
         a = (first_line.split())  
-        L = float(a[1])
-        Area = float(a[2])*float(a[3])
+        #L = float(a[1])
+        #Area = float(a[2])*float(a[3])
         
         #exit()
          
@@ -34,6 +34,8 @@ class network(Base):
         Pores   = np.loadtxt("test1D_node2.dat")
         Pores1   = np.loadtxt('test1D_node1.dat',skiprows=1, usecols=(0,1,2,3,4))
         #'''
+        
+        
         Pores    = Pores[Pores1[:,4]>0,:] #
         Pores1    = Pores1[Pores1[:,4]>0,:] #  
         nonIsolatedPores = Pores[:,0]
@@ -47,7 +49,7 @@ class network(Base):
         nP=len(nonIsolatedPores)
         nT=len(Throats1)
         network['pore._id']=temp
-        network['pore.label']=temp
+        network['pore.label']=nonIsolatedPores-1
         network['pore.all']=np.ones(nP).astype(bool)
         network['pore.volume']=Pores[:,1]
         network['pore.radius']=Pores[:,2]
@@ -58,18 +60,29 @@ class network(Base):
         network['throat._id']=Throats1[:,0]
         network['throat.label']=Throats1[:,0]
         network['throat.all']=np.ones(nT).astype(bool)
-        network['throat.inlets']=inThroats
-        network['throat.outlets']=outThroats
+        #network['throat.inlets']=inThroats
+        #network['throat.outlets']=outThroats
 
         network['throat.inside']=~(inThroats|outThroats)
-        network['throat.shape_factor']=Throats1[:,0]
-        network['throat.conns']=Throats1[:,1:3]-[1,1]
+        network['throat.shape_factor']=Throats1[:,0]        
+        throat_conns=Throats1[:,1:3]-[1,1]
+        throat_conns[throat_conns[:,0]>throat_conns[:,1]]=(throat_conns[:,[1,0]])[throat_conns[:,0]>throat_conns[:,1]]
+        throat_out_in=throat_conns[(throat_conns[:,0]<0)]
+        index=np.digitize(throat_out_in[:,1],network['pore.label'])-1
+        throat_out_in[:,1]=network['pore._id'][index]
+        throat_internal=throat_conns[(throat_conns[:,0]>=0)]
+        index=np.digitize(throat_internal[:,0],network['pore.label'])-1
+        throat_internal[:,0]=network['pore._id'][index]
+        index=np.digitize(throat_internal[:,1],network['pore.label'])-1
+        throat_internal[:,1]=network['pore._id'][index]    
+        network['throat.conns']=np.concatenate((throat_out_in,throat_internal),axis=0).astype(np.int64)
+        network['pore.label']=temp
         network['pore.inlets']=~np.copy(network['pore.all'])
-        network['pore.inlets'][np.array(network['throat.conns'][inThroats][:,1]).astype(int)]=True
+        network['pore.inlets'][np.array(network['throat.conns'][network['throat.conns'][:,0]==-2][:,1]).astype(int)]=True
         network['pore.outlets']=~np.copy(network['pore.all'])
-        network['pore.outlets'][np.array(network['throat.conns'][outThroats][:,1]).astype(int)]=True
+        network['pore.outlets'][np.array(network['throat.conns'][network['throat.conns'][:,0]==-1][:,1]).astype(int)]=True
         network['throat.radius']=Throats1[:,3]
-        network['throat.radius']=Throats1[:,4]
+        network['throat.shape_factor']=Throats1[:,4]
         network['throat.length']=Throats2[:,5]
         network['throat.total_length']=Throats1[:,5]
         network['throat.conduit_lengths_pore1']=Throats2[:,3]
