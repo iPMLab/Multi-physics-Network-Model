@@ -9,8 +9,8 @@ Folder ```sample_data/Bead_packing``` is the example computing absolute permeabi
 ```
 python single_phase_permeability.py 
 ```
-## Example 2 (Being prepared and will be uploaded soon)
-This example is to simulate heat and mass transfer using a dual-network.
+## Example 2 Coupled heat and mass transfer
+This example is to simulate heat and mass transfer using a dual-network. 
 
 # Contact
 Please contact us if you need more demos or information:
