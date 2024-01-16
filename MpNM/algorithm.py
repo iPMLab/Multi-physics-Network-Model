@@ -21,7 +21,7 @@ class algorithm(Base):
     def stead_stay_alg_multi(self, network, fluid, coe_A, Boundary_condition, resolution, bound_cond):
         num_pore = len(network.pores())
         A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                       shape=(num_pore, num_pore), dtype=np.float64).tolil()
+                       shape=(num_pore, num_pore), dtype=np.float64).tocsr()
         A = (A.getH() + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
@@ -79,7 +79,7 @@ class algorithm(Base):
                             throat_outlet_cond[:, 0].astype(int)]
 
         A.setdiag(-dig, 0)
-        A = A.tocsc()
+        A = A.tocsr()
         Profile = pp.spsolve(A, b)
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
@@ -87,7 +87,7 @@ class algorithm(Base):
     def stead_stay_alg(self, network, fluid, coe_A, Boundary_condition, resolution, bound_cond):
         num_pore = len(network['pore.all'])
         A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                       shape=(num_pore, num_pore), dtype=np.float64).tolil()
+                       shape=(num_pore, num_pore), dtype=np.float64).tocsr()
         A = (A.getH() + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
@@ -141,7 +141,7 @@ class algorithm(Base):
                             dig[throat_inlet_cond[:, 0].astype(int)] += 0
                             b[throat_inlet_cond[:, 0].astype(int)] = 0
         A.setdiag(-dig, 0)
-        A = A.tocsc()
+        A = A.tocsr()
         Profile = pp.spsolve(A, b)
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
@@ -149,14 +149,14 @@ class algorithm(Base):
     def correct_pressure(self, network, coe_A, Boundary_condition, resolution, S_term=False):
         num_pore = len(network['pore.all'])
         A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                       shape=(num_pore, num_pore), dtype=np.float64).tolil()
+                       shape=(num_pore, num_pore), dtype=np.float64).tocsr()
         A = (A.getH() + A).tolil()
         dig = -np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
 
         A.setdiag(dig, 0)
         b = b + S_term
-        A = A.tocsc()
+        A = A.tocsr()
         Profile = pp.spsolve(A, b)
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
@@ -168,14 +168,14 @@ class algorithm(Base):
         Num = num_node // 25000
         Num = 2 if Num < 2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
 
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -238,7 +238,7 @@ class algorithm(Base):
         # _----------------------------steady-state-------------------------------#
 
         A_c.setdiag(-dig, 0)
-        A_c = A_c.tocsc()
+        A_c = A_c.tocsr()
         # Tem_c,j=ssl.bicgstab(A_c,b,tol=1e-8)
         Tem_c = pp.spsolve(A_c, b)
         return Tem_c
@@ -252,13 +252,13 @@ class algorithm(Base):
         Num = max((num_node // 25000), 2)
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -339,7 +339,7 @@ class algorithm(Base):
 
         # diagonal should update for delta_t
         A_c.setdiag(dig_c, 0)  # add diagonal into A_c
-        A_c = A_c.tocsc()  # we transfer A_c for next calculation
+        A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = np.copy(b) + S_term
         test = A.sum(axis=0)
@@ -358,14 +358,14 @@ class algorithm(Base):
         Num = num_node // 25000
         Num = 2 if Num < 2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
 
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -434,7 +434,7 @@ class algorithm(Base):
             dig_c = dig - delta_dig  # fluid_density*fluid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.void']-solid_density*solid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.solid']
             # diagonal should update for delta_t
             A_c.setdiag(-dig_c, 0)  # add diagonal into A_c
-            A_c = A_c.tocsc()  # we transfer A_c for next calculation
+            A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
             b_c = b + delta_dig * x0
             # fluid_density*fluid_Cp*network['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
@@ -453,14 +453,14 @@ class algorithm(Base):
         Num = min((num_node // 25000) + 1, 10)
         # Num=2 if Num <2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
 
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -528,7 +528,7 @@ class algorithm(Base):
         dig_c = dig - delta_dig  # fluid_density*fluid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.void']-solid_density*solid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.solid']
         # diagonal should update for delta_t
         A_c.setdiag(-dig_c, 0)  # add diagonal into A_c
-        A_c = A_c.tocsc()  # we transfer A_c for next calculation
+        A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = b + delta_dig * x0
         # fluid_density*fluid_Cp*network['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
@@ -546,13 +546,13 @@ class algorithm(Base):
         Num = (num_node // 25000) + 1
         # Num=2 if Num <2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -578,7 +578,7 @@ class algorithm(Base):
 
         # diagonal should update for delta_t
         A_c.setdiag(dig_c, 0)  # add diagonal into A_c
-        A_c = A_c.tocsc()  # we transfer A_c for next calculation
+        A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = b + delta_dig * x0
         # fluid_density*fluid_Cp*network['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
@@ -650,13 +650,13 @@ class algorithm(Base):
         Num = max((num_node // 25000), 2)
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -729,7 +729,7 @@ class algorithm(Base):
 
         # diagonal should update for delta_t
         A_c.setdiag(dig_c, 0)  # add diagonal into A_c
-        A_c = A_c.tocsc()  # we transfer A_c for next calculation
+        A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = b + delta_dig * x0
 
@@ -748,13 +748,13 @@ class algorithm(Base):
         Num = max((num_node // 25000), 2)
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
         # RH= func_pv(1.0,302)/func_ps(302)
@@ -843,7 +843,7 @@ class algorithm(Base):
 
         # diagonal should update for delta_t
         A_c.setdiag(dig_c, 0)  # add diagonal into A_c
-        A_c = A_c.tocsc()  # we transfer A_c for next calculation
+        A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = b + delta_dig * x0 + S_term
 
@@ -862,13 +862,13 @@ class algorithm(Base):
         Num = max((num_node // 25000), 2)
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.getH() + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tolil()
+                       shape=(num_node, num_node), dtype=np.float64).tocsr()
         AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tolil()
+                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -948,7 +948,7 @@ class algorithm(Base):
 
         # diagonal should update for delta_t
         A_c.setdiag(dig_c, 0)  # add diagonal into A_c
-        A_c = A_c.tocsc()  # we transfer A_c for next calculation
+        A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = b + delta_dig * x0
 
