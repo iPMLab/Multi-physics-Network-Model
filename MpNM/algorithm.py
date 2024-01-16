@@ -9,12 +9,10 @@ Created on Fri Jun 17 18:48:35 2022
 from scipy.sparse import coo_matrix
 import scipy.sparse.linalg as ssl
 import pypardiso as pp
-import numpy as np
 import openpnm as op
-from joblib import Parallel, delayed
-from Base import *
-from topotools import topotools as tool
-from network import network as net
+from MpNM.Base import *
+from MpNM.topotools import topotools as tool
+from MpNM.network import network as net
 
 
 class algorithm(Base):

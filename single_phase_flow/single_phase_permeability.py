@@ -80,7 +80,7 @@ Boundary_condition_P={}
 Boundary_condition_P['pore_inlet']={'pore.inlets':[1,'Dirichlet']}
 Boundary_condition_P['pore_outlet']={'pore.outlets':[0,'Dirichlet']}
 
-coe_A=np.array(topotools().Mass_conductivity(pn,fluid))/pn['throat.total_length']
+coe_A=np.array(topotools().Mass_conductivity(pn))/pn['throat.total_length']
 coe_A_P=coe_A
 Profile=algorithm().stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P,resolution,bound_cond)
 delta_p=np.array([Profile[k[1]]-Profile[k[0]] for k in pn['throat.conns']])

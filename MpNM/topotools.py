@@ -8,60 +8,49 @@ Created on Thu Apr 14 16:55:27 2022
 import numpy as np
 import openpnm as op
 from joblib import Parallel, delayed
-from Base import *
+from MpNM.Base import *
 import copy
 from scipy.sparse import coo_matrix
-from tools_numba import *
+from MpNM.tools_numba import *
 import scipy.spatial as spt
 import numba as nb
 import os
 
-num_threads=os.environ.get('num_threads')
-if num_threads==None:
+num_threads = os.environ.get('num_threads')
+if num_threads == None:
     pass
 else:
     nb.set_num_threads(int(num_threads))
 
+if 'update_pore_info' not in os.environ.keys():
+    os.environ['update_pore_info'] = 'False'
 
-if 'pore_update' not in os.environ.keys():
-    os.environ['pore_update'] = 'False'
 
-
-def network_input_check(update=True if os.environ['pore_update'] == 'True' else False):
-    def outwrapper(func):
-        def wrapper(*args, **kwargs):
-            args = list(args)
-            var_names = func.__code__.co_varnames[:func.__code__.co_argcount]
-            if 'network' in var_names:
-                index_network = var_names.index('network')
-                if 'pore.void' in args[index_network].keys():
-                    pass
-                else:
-                    args[index_network]['pore.void'] = np.zeros(len(args[index_network]['pore._id']), dtype=bool)
-                if 'pore.solid' in args[index_network].keys():
-                    pass
-                else:
-                    args[index_network]['pore.solid'] = np.zeros(len(args[index_network]['pore._id']), dtype=bool)
-                if 'pore.throat_conns' in args[index_network].keys():
-                    pass
-                else:
-                    args[index_network] = topotools().update_throat_conns(args[index_network])
-                if 'pore.start2end' in args[index_network].keys():
-                    pass
-                else:
-                    args[index_network] = topotools().update_throat_conns(args[index_network])
-                if update == True:
-                    args[index_network] = topotools().update_throat_conns(args[index_network])
-            if 'ids' in var_names:
-                index_ids = var_names.index('ids')
-                if type(args[index_ids]) != np.ndarray:
-                    args[index_ids] = np.array([args[index_ids]])
-
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return outwrapper
+def check_input(**kwarg):
+    if 'network' in kwarg:
+        if 'pore.solid' not in kwarg['network']:
+            kwarg['network']['pore.solid'] = np.zeros_like(kwarg['network']['pore.void'])
+        else:
+            pass
+        if 'pore.info' not in kwarg['network']:
+            kwarg['network'].update(topotools().update_pore_info(kwarg['network']))
+        else:
+            pass
+        if 'pore.start2end' not in kwarg['network']:
+            kwarg['network'].update(topotools().update_pore_info(kwarg['network']))
+        else:
+            pass
+        if os.environ['update_pore_info'] == 'True':
+            kwarg['network'].update(topotools().update_pore_info(kwarg['network']))
+        if 'ids' in kwarg:
+            if isinstance(kwarg['ids'], np.ndarray):
+                ids = kwarg['ids']
+            elif type(kwarg[
+                          'ids']) == int or float or np.int64 or np.int16 or np.int8 or np.float32 or np.float64 or np.float16 or np.float8:
+                ids = np.array([kwarg['ids']])
+            elif type(kwarg['ids']) == list:
+                ids = np.array(kwarg['ids'])
+            return ids
 
 
 class topotools(Base):
@@ -394,7 +383,7 @@ class topotools(Base):
             #size1=int(imsize[0]/100 )
             #size2=int(imsize[2]/100 )
             size=int(imsize[2]/100 )
-            
+
         elif status =='y':
             size=int(imsize[1]/100)
             #size1=int(imsize[0]/100 )
@@ -476,23 +465,14 @@ class topotools(Base):
         return layer
 
     def pore_health(self, network):
-        number = len(network['pore.all'])
-        conns = np.copy(network['throat.conns'])
+        pores_in_conns, counts = np.unique(network['throat.conns'], return_counts=True)
+        pores_in_conns = pores_in_conns[counts > 1]
+        pores = np.arange(len(network['pore.all']))
+        single_pores = np.setdiff1d(pores, pores_in_conns, assume_unique=True)
+
         health = {}
-        health['single_pore'] = []
+        health['single_pore'] = single_pores.tolist()
         health['single_throat'] = []
-
-        for i in np.arange(number):
-            val0 = len(conns[:, 0][conns[:, 0] == i])
-            val1 = len(conns[:, 1][conns[:, 1] == i])
-
-            if val1 + val0 < 1:
-
-                health['single_pore'].append(i)
-                ind0 = np.argwhere(conns[:, 0] == i)
-                ind1 = np.argwhere(conns[:, 1] == i)
-                if len(ind0) > 0 or len(ind1) > 0:
-                    health['single_throat'].append(np.concatenate((ind0, ind1))[0][0])
 
         return health
 
@@ -529,11 +509,7 @@ class topotools(Base):
 
         backup['pore._id'] = np.arange(len(backup['pore.all']))
 
-        isothroat = np.array([])
-        for j in pores:
-            if np.count_nonzero(backup['throat.conns'] == j) > 0:
-                isothroat = np.append(isothroat, np.argwhere(backup['throat.conns'] == j)[:, 0])
-        isothroat = np.unique(isothroat.astype(np.int64))
+        isothroat = np.where(np.any(np.isin(backup['throat.conns'], pores), axis=1))[0]
         for i in network:
             if 'throat' in i:
                 backup[i] = np.delete(backup[i], isothroat, axis=0)
@@ -652,16 +628,10 @@ class topotools(Base):
         else:
             return 0
 
-    @network_input_check()
     def find_neighbor_ball_(self, network, ids):
-        if 'pore.void' not in network.keys():
-            network_pore_void = np.zeros(len(network['pore._id']), dtype=np.bool_)
-        else:
-            network_pore_void = network['pore.void']
-        if 'pore.solid' not in network.keys():
-            network_pore_solid = np.zeros(len(network['pore._id']), dtype=np.bool_)
-        else:
-            network_pore_solid = network['pore.solid']
+        ids = check_input(network=network, ids=ids)
+        network_pore_void = network['pore.void']
+        network_pore_solid = network['pore.solid']
         return find_neighbor_ball_nb(network_pore_void, network_pore_solid, network['throat.conns'], ids)
 
     def H_P_fun(self, r, l, vis):
@@ -722,27 +692,27 @@ class topotools(Base):
 
         return np.array(throat_inlet_cond)
 
-    @network_input_check()
     def species_balance_conv(self, network, g_ij, Tem, thermal_con_dual, P_profile, ids):
+        ids = check_input(network=network, ids=ids)
         network_pore_void = network['pore.void']
         network_pore_solid = network['pore.solid']
-        pore_throat_conns = network['pore.throat_conns']
+        pore_info = network['pore.info']
         pore_start2end = network['pore.start2end']
         result = species_balance_conv_nb(network['throat.radius'], network['throat.length'], network['throat.Cp'],
                                          network['throat.density'], g_ij, Tem, thermal_con_dual, P_profile, ids,
                                          network_pore_void, network_pore_solid, network['throat.conns'],
-                                         pore_throat_conns, pore_start2end)
+                                         pore_info, pore_start2end)
 
         if len(ids) == 1:
             return result[0]
         else:
             return result
 
-    @network_input_check()
     def calculate_species_flow(self, network, Boundary_condition, g_ij, Tem_c, thermal_con_dual, P_profile, Num):
+        check_input(network=network)
         network_pore_void = network['pore.void']
         network_pore_solid = network['pore.solid']
-        pore_throat_conns = network['pore.throat_conns']
+        pore_info = network['pore.info']
         pore_start2end = network['pore.start2end']
         output = {}
         total = 0
@@ -753,35 +723,35 @@ class topotools(Base):
                                                  network['throat.density'], g_ij, Tem_c, thermal_con_dual, P_profile,
                                                  network['pore._id'][network[n]], network_pore_void,
                                                  network_pore_solid,
-                                                 network['throat.conns'], pore_throat_conns, pore_start2end)[:, 0]
+                                                 network['throat.conns'], pore_info, pore_start2end)[:, 0]
                 output.update({n: np.sum(result)})
         for i in output:
             total += output[i]
         output.update({'total': np.sum(total)})
         return output
 
-    @network_input_check()
     def energy_balance_conv(self, network, g_ij, Tem, thermal_con_dual, P_profile, ids):
+        ids = check_input(network=network, ids=ids)
         network_pore_void = network['pore.void']
         network_pore_solid = network['pore.solid']
-        pore_throat_conns = network['pore.throat_conns']
+        pore_info = network['pore.info']
         pore_start2end = network['pore.start2end']
         result = energy_balance_conv_nb(network['throat.radius'], network['throat.length'],
                                         network['throat.Cp'],
                                         network['throat.density'], g_ij, Tem, thermal_con_dual, P_profile, ids,
                                         network_pore_void,
-                                        network_pore_solid, network['throat.conns'], pore_throat_conns, pore_start2end)
+                                        network_pore_solid, network['throat.conns'], pore_info, pore_start2end)
 
         if len(ids) == 1:
             return result[0]
         else:
             return result
 
-    @network_input_check()
     def calculate_heat_flow(self, network, Boundary_condition, g_ij, Tem_c, thermal_con_dual, P_profile, Num):
+        check_input(network=network)
         network_pore_void = network['pore.void']
         network_pore_solid = network['pore.solid']
-        pore_throat_conns = network['pore.throat_conns']
+        pore_info = network['pore.info']
         pore_start2end = network['pore.start2end']
         output = {}
         total = 0
@@ -792,33 +762,30 @@ class topotools(Base):
                                                 network['throat.density'], g_ij, Tem_c, thermal_con_dual, P_profile,
                                                 network['pore._id'][network[n]], network_pore_void,
                                                 network_pore_solid,
-                                                network['throat.conns'], pore_throat_conns, pore_start2end)[:, 0]
+                                                network['throat.conns'], pore_info, pore_start2end)[:, 0]
                 output.update({n: np.sum(result)})
         for i in output:
             total += output[i]
         output.update({'total': np.sum(total)})
         return output
 
-    @network_input_check()
     def mass_balance_conv(self, network, g_ij, P_profile, ids):
+        ids = check_input(network=network, ids=ids)
         network_pore_void = network['pore.void']
         network_pore_solid = network['pore.solid']
-        pore_throat_conns = network['pore.throat_conns']
+        pore_info = network['pore.info']
         pore_start2end = network['pore.start2end']
         result = mass_balance_conv_nb(g_ij, P_profile, ids, network_pore_void,
                                       network_pore_solid,
-                                      network['throat.conns'],pore_throat_conns,pore_start2end)
-        # if len(ids) == 1:
-        #     return result[0]
-        # else:
-        #     return result
+                                      network['throat.conns'], pore_info, pore_start2end)
+
         if len(ids) == 1:
             return result[0]
         else:
             return result
 
-    @network_input_check()
     def mass_balance_conv_o(self, network, g_ij, P_profile, ids):
+        ids = check_input(network=network, ids=ids)
         # res=find_neighbor_ball(network,[ids])
         res = self.find_neighbor_ball(network, ids)
         if res == 0:
@@ -839,15 +806,15 @@ class topotools(Base):
         # print('h_conv_f=%f,h_cond_f=%f, h_cond_sf=%f,h_cond_s=%f'%(h_conv_f,h_cond_f, h_cond_sf,h_cond_s))
         return result
 
-    @network_input_check()
     def calculate_mass_flow(self, network, Boundary_condition, g_ij, P_profile, Num):
+        check_input(network=network)
         network_pore_void = network['pore.void']
         network_pore_solid = network['pore.solid']
-        pore_throat_conns = network['pore.throat_conns']
+        pore_info = network['pore.info']
         pore_start2end = network['pore.start2end']
         result = mass_balance_conv_nb(g_ij, P_profile, network['pore._id'], network_pore_void,
                                       network_pore_solid,
-                                      network['throat.conns'],pore_throat_conns,pore_start2end)
+                                      network['throat.conns'], pore_info, pore_start2end)
         output = {}
         total = 0
         for m in Boundary_condition:
@@ -859,21 +826,32 @@ class topotools(Base):
         output.update({'total': np.sum(total)})
         return output
 
-    @network_input_check()
     def cal_pore_veloc(self, network, fluid, g_ij, P_profile, ids):
+        ids = check_input(network=network, ids=ids)
         network_pore_void = network['pore.void']
         network_pore_solid = network['pore.solid']
-        pore_throat_conns = network['pore.throat_conns']
+        pore_info = network['pore.info']
         pore_start2end = network['pore.start2end']
         result = cal_pore_veloc_nb(network['throat.area'], network['pore.radius'], network['pore.real_shape_factor'],
                                    g_ij, P_profile, ids, network_pore_void,
                                    network_pore_solid,
-                                   network['throat.conns'], pore_throat_conns, pore_start2end)
+                                   network['throat.conns'], pore_info, pore_start2end)
 
         if len(ids) == 1:
             return result[0]
         else:
             return result
+
+    def cal_pore_flux(self, network, Boundary_condition, g_ij, P_profile, Num):
+        check_input(network=network)
+        network_pore_void = network['pore.void']
+        network_pore_solid = network['pore.solid']
+        pore_info = network['pore.info']
+        pore_start2end = network['pore.start2end']
+        result = mass_balance_conv_nb(g_ij, P_profile, network['pore._id'], network_pore_void,
+                                      network_pore_solid,
+                                      network['throat.conns'], pore_info, pore_start2end)
+        return result
 
     '''
     def add_pores(self,network1,network2,trail=True):#network=network1,network2
@@ -881,7 +859,7 @@ class topotools(Base):
         num_t=len(network1['throat.all'])
         network2['throat._id']+=num_t
         network2['pore.label']+=num_p
-        
+
         network={}
         if trail:
             network2['throat.conns']+=num_p
@@ -889,7 +867,7 @@ class topotools(Base):
             if i not in network1:
                 network[i]=np.zeros(num_p).astype(bool)
                 network[i]=np.concatenate((network[i],network2[i])) 
-                
+
             else:
                 network[i]=np.concatenate((network1[i],network2[i])) 
         return network
@@ -1027,7 +1005,7 @@ class topotools(Base):
         del network['pore.' + side + '_surface'], network['pore.' + side1 + '_surface']
         '''
         if side1 in ['left','back','bottom']:
-            
+
             topotools().find_surface(network,np.array(['x','y','z'])[way],
                                  imsize[way]*2,resolution,label_1=side1+'_surface',label_2=side+'_surface')
         else:
@@ -1036,7 +1014,7 @@ class topotools(Base):
         '''
         return network
 
-    def update_throat_conns(self, network):
+    def update_pore_info(self, network):
         print('Updating pore conns information')
         '''
         0=Pore, 1=Solid, 2=Interface
@@ -1049,14 +1027,18 @@ class topotools(Base):
             pass
         else:
             network['pore.solid'] = np.zeros(len(network['pore._id']), dtype=bool)
-        total_information = np.concatenate(
-            (network['throat.conns'], np.array([np.arange(0, len(network['throat.conns']))]).T),
-            axis=1)
-        total_information = np.concatenate((total_information, total_information[:, [1, 0, 2]]), axis=0)
-        total_information = total_information[np.argsort(total_information[:, 0])]
-        total_information = np.concatenate((total_information, -np.ones((len(total_information), 1), dtype=np.int64)),
-                                           axis=1)
 
+        len_throat_conns = len(network['throat.conns'])
+        index_throat = np.arange(0, len_throat_conns)
+        total_information = np.zeros((2 * len_throat_conns, 4), dtype=np.int64)
+        total_information[:len_throat_conns, 0] = network['throat.conns'][:, 0]
+        total_information[len_throat_conns:, 0] = network['throat.conns'][:, 1]
+        total_information[:len_throat_conns, 1] = network['throat.conns'][:, 1]
+        total_information[len_throat_conns:, 1] = network['throat.conns'][:, 0]
+        total_information[:len_throat_conns, 2] = index_throat
+        total_information[len_throat_conns:, 2] = index_throat
+        # total_information[:,3]=-1
+        total_information = total_information[np.argsort(total_information[:, 0])]
         elements, counts = np.unique(total_information[:, 0], return_counts=True)
         start = np.concatenate((np.array([0]), np.cumsum(counts)[0:-1]), axis=0)
         end = np.cumsum(counts)
@@ -1064,11 +1046,9 @@ class topotools(Base):
         start2end[elements] = np.concatenate((np.array([start]).T, np.array([end]).T), axis=1)
         total_information[:, 3] = np.where(
             network['pore.void'][total_information[:, 0]] & network['pore.void'][total_information[:, 1]], 0, np.where(
-            network['pore.solid'][total_information[:, 0]] & network['pore.solid'][total_information[:, 1]], 1, 2))
-        # update_pore_conns_information_nb(network['pore.void'], network['pore.solid'], network['throat.conns'], network['pore._id'],
-        #                                  elements, total_information, start2end)
+                network['pore.solid'][total_information[:, 0]] & network['pore.solid'][total_information[:, 1]], 1, 2))
 
-        temp = {'pore.throat_conns': total_information, 'pore.start2end': start2end}
+        temp = {'pore.info': total_information, 'pore.start2end': start2end}
         network.update(temp)
-        print('Finished updating pore conns information')
+        print('Finished updating pore info')
         return network
