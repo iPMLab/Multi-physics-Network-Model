@@ -20,7 +20,7 @@ class algorithm(Base):
         num_pore = len(network.pores())
         A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
                        shape=(num_pore, num_pore), dtype=np.float64).tocsr()
-        A = (A.getH() + A).tolil()
+        A = (A.T + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
 
@@ -86,7 +86,7 @@ class algorithm(Base):
         num_pore = len(network['pore.all'])
         A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
                        shape=(num_pore, num_pore), dtype=np.float64).tocsr()
-        A = (A.getH() + A).tolil()
+        A = (A.T + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
         # B=A.toarray()
@@ -148,7 +148,7 @@ class algorithm(Base):
         num_pore = len(network['pore.all'])
         A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
                        shape=(num_pore, num_pore), dtype=np.float64).tocsr()
-        A = (A.getH() + A).tolil()
+        A = (A.T + A).tolil()
         dig = -np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
 
@@ -167,7 +167,7 @@ class algorithm(Base):
         Num = 2 if Num < 2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
 
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
@@ -251,7 +251,7 @@ class algorithm(Base):
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
@@ -357,7 +357,7 @@ class algorithm(Base):
         Num = 2 if Num < 2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
 
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
@@ -452,7 +452,7 @@ class algorithm(Base):
         # Num=2 if Num <2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
 
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
@@ -545,7 +545,7 @@ class algorithm(Base):
         # Num=2 if Num <2 else Num
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
@@ -649,7 +649,7 @@ class algorithm(Base):
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
@@ -747,7 +747,7 @@ class algorithm(Base):
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
@@ -861,7 +861,7 @@ class algorithm(Base):
 
         B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        A0 = (B.getH() + B).tolil()
+        A0 = (B.T + B).tolil()
         del B
         A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
