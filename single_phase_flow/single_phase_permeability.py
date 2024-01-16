@@ -31,7 +31,6 @@ pn_o = network().read_network(path=path, name=name)
 health = topotools().pore_health(pn_o)
 
 back = topotools().trim_pore(pn_o, health['single_pore'], health['single_throat'])
-
 # pn=op.network.GenericNetwork(name='pn')
 # pn.update(back)
 pn = {}
