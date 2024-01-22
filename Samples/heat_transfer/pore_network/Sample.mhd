@@ -1,0 +1,16 @@
+ObjectType =  Image
+NDims =       3
+ElementType = MET_UCHAR
+ElementByteOrderMSB = False
+HeaderSize = 0
+DimSize =    	250	500	2800
+ElementSize = 	21.4  21.4   21.4 
+Offset =      	0   	0   	0
+
+ElementDataFile = sphere_stacking_250_500_2800_20.raw
+
+DefaultImageFormat = .raw
+
+direction z
+
+pore 0 0
