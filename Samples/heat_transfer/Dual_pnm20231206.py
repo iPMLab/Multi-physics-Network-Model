@@ -8,7 +8,7 @@ Created on Sun Dec 12 14:25:38 2021
 
 import sys
 
-sys.path.append('/home/htmt/Documents/GenPNM/')
+sys.path.append('/media/htmt/Expansion/Multi-physics-Network-Model/')
 from MpNM.phase import phase
 from MpNM.topotools import topotools
 from MpNM.algorithm import algorithm
@@ -38,7 +38,7 @@ def lambda_calc_nb(j, heat_coe, fluid_lambda, solid_lambda, network_throat_conns
                    network_pore_radius):
     result = np.zeros((len(j), 3), dtype=np.float64)
     for id in nb.prange(len(j)):
-        j_=j[id]
+        j_ = j[id]
         i = network_throat_conns[j_]
         l = network_throat_length[j_] / (network_pore_radius[i[0]] + network_pore_radius[i[1]])
         heat_s_f = (network_throat_length[j_] / (
@@ -64,7 +64,7 @@ def lambda_calc_nb(j, heat_coe, fluid_lambda, solid_lambda, network_throat_conns
 path = './pore_network'
 # project = op.io.Statoil.load(path=path, prefix='sphere_stacking_250_500_2800_20')
 
-project=network().read_network(path=path, name='sphere_stacking_250_500_2800_20')
+project = network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
 pn_o = project
 # pn_o.name = 'pore'
 
@@ -77,18 +77,18 @@ pn_o = project
 # water = op.phases.Water(network=pn)
 imsize = np.array([2800, 500, 250])
 resolution = 21.4e-6
-connect_throat = pd.read_csv('./solid_network/dual_network_interface_sphere_stacking_250_500_2800_20.csv')
+connect_throat = pd.read_csv('./solid_network/dual_network_interface_sphere_stacking_500_500_2000_60.csv')
 connect_throat = np.array(connect_throat)[:, 1:] - [1, 1, 0]
 connect_throat[:, 2] = (connect_throat[:, 2] / np.pi) ** 0.5 * resolution
 conn_t = np.array(connect_throat)
-data_volume = pd.read_csv('./solid_network/dual_network_volume_sphere_stacking_250_500_2800_20.csv')
+data_volume = pd.read_csv('./solid_network/dual_network_volume_sphere_stacking_500_500_2000_60.csv')
 
 '''
 path='./pore_center_500_500_2500_20.csv'
 pore_im=pd.read_csv(path)
 pore_im=np.array(pore_im)
 '''
-path = './solid_network/solid_center_sphere_stacking_250_500_2800_20.csv'
+path = './solid_network/solid_center_sphere_stacking_500_500_2000_60.csv'
 solid_im = pd.read_csv(path)
 solid_im = np.array(solid_im)
 
@@ -114,7 +114,7 @@ pore['throat.length']=pn_o['throat.length']#
 pore['throat.void']=np.ones(pore['throat.all'].size).astype(bool)
 '''
 # pn = op.network.GenericNetwork(name='pn')
-pn={}
+pn = {}
 pn.update(pn_o)
 # pn.update(pore)
 
@@ -204,14 +204,14 @@ dualn['pore.surface'] = data_surface * resolution ** 2
 dualn['pore.surface'][dualn['pore.surface'] <= 0] = resolution
 dualn['pore.hydraulic_diameter'] = 6 * dualn['pore.volume'] / dualn['pore.surface']
 
-topotools().find_surface(pn, 'x', imsize, resolution, label_1='left_surface', label_2='right_surface')
-topotools().find_surface(pn, 'y', imsize, resolution, label_1='back_surface', label_2='front_surface')
-topotools().find_surface(pn, 'z', imsize, resolution, label_1='bottom_surface', label_2='top_surface')
+topotools().find_surface_KDTree(pn, 'x', imsize, resolution, label_1='left_surface', label_2='right_surface')
+topotools().find_surface_KDTree(pn, 'y', imsize, resolution, label_1='back_surface', label_2='front_surface')
+topotools().find_surface_KDTree(pn, 'z', imsize, resolution, label_1='bottom_surface', label_2='top_surface')
 topotools().trim_surface(pn)
 
-topotools().find_surface(dualn, 'x', imsize, resolution, label_1='left_surface', label_2='right_surface')
-topotools().find_surface(dualn, 'y', imsize, resolution, label_1='back_surface', label_2='front_surface')
-topotools().find_surface(dualn, 'z', imsize, resolution, label_1='bottom_surface', label_2='top_surface')
+topotools().find_surface_KDTree(dualn, 'x', imsize, resolution, label_1='left_surface', label_2='right_surface')
+topotools().find_surface_KDTree(dualn, 'y', imsize, resolution, label_1='back_surface', label_2='front_surface')
+topotools().find_surface_KDTree(dualn, 'z', imsize, resolution, label_1='bottom_surface', label_2='top_surface')
 topotools().trim_surface(dualn)
 
 for i in ['left', 'right', 'top', 'bottom', 'front', 'back']:
@@ -242,9 +242,9 @@ sn['pore._id'] = np.arange(sn['pore._id'].size)
 sn['throat._id'] = np.arange(sn['throat._id'].size)
 sn['pore.volume'] = dualn['pore.volume'][dualn['pore.solid']]
 sn['throat.length'] = dualn['throat.length'][dualn['throat.solid']]
-sn['throat.label'] = sn['thraot._id']
+sn['throat.label'] = sn['throat._id']
 sn['pore.label'] = sn['pore._id']
-pn['throat.label'] = pn['thraot._id']
+pn['throat.label'] = pn['throat._id']
 pn['pore.label'] = pn['pore._id']
 pn['pore.volume'] = dualn['pore.volume'][dualn['pore.void']]
 # pn['throat.length']=dualn['throat.length'][dualn['throat.void']]
@@ -258,7 +258,8 @@ backup = topotools().trim_pore(dualn, np.append(health['single_pore'], health_p[
 # backup=trim_pore(dualn,health_p['single_pore'],health_p['single_throat'])
 dualn.update(backup)
 
-water = op.phases.Water(network=pn)
+# water = op.phases.Water(network=pn)
+water = {}
 '''
 op.io.VTK.export_data(network=pn,phases=water,filename='./pore_structure')
 rock= op.phases.Water(network=sn)
@@ -395,13 +396,14 @@ for n in np.arange(6):
             #     Throat_pre.append((P_profile[k[1]] + P_profile[k[0]]) / 2)
             # Throat_tem = np.array(Throat_tem)
             # Throat_pre = np.array(Throat_pre)
-            Throat_tem=(T_x0[dualn['throat.conns'][:,1]]+T_x0[dualn['throat.conns'][:,0]])/2
-            Throat_pre=(P_profile[dualn['throat.conns'][:,1]]+P_profile[dualn['throat.conns'][:,0]])/2
+            Throat_tem = (T_x0[dualn['throat.conns'][:, 1]] + T_x0[dualn['throat.conns'][:, 0]]) / 2
+            Throat_pre = (P_profile[dualn['throat.conns'][:, 1]] + P_profile[dualn['throat.conns'][:, 0]]) / 2
 
             dualn['throat.viscosity'] = miu(Throat_tem, Throat_pre + 1.013e5)
             pn['throat.viscosity'] = dualn['throat.viscosity'][dualn['throat.void']]
 
-            water = op.phases.Water(network=pn)
+            # water = op.phases.Water(network=pn)
+            water = {}
 
 
             # ---------------'''pressure process '''---------------#
@@ -479,7 +481,7 @@ for n in np.arange(6):
                 abs_perm *= np.average(pn['pore.viscosity']) * imsize[0] / (imsize[1] * imsize[2]) / resolution
                 Perm = abs_perm
             water['pore.pressure'] = P_profile[dualn['pore.void']]
-            delta_p=P_profile_tem[pn['throat.conns'][:, 1]] - P_profile_tem[pn['throat.conns'][:, 0]]
+            delta_p = P_profile_tem[pn['throat.conns'][:, 1]] - P_profile_tem[pn['throat.conns'][:, 0]]
 
             # ---------------'''temperature process '''---------------#
 
@@ -487,7 +489,8 @@ for n in np.arange(6):
             Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 / 4 / pn['throat.real_shape_factor']
             RE_th = Vel_Throat_profile * pn['throat.radius'] * 2 * fluid['density'] / pn['throat.viscosity']
             # flux_Pore_profile=[cal_pore_veloc(pn,fluid,coe_A,P_profile,a) for a in pn['pore._id']]
-            Vel_Pore_profile = topotools().cal_pore_veloc(pn, fluid, coe_A_P, P_profile[dualn['pore.void']], pn['pore._id'])
+            Vel_Pore_profile = topotools().cal_pore_veloc(pn, fluid, coe_A_P, P_profile[dualn['pore.void']],
+                                                          pn['pore._id'])
             RE_po = Vel_Pore_profile * pn['pore.radius'] * 2 * fluid['density'] / pn['pore.viscosity']
             # P_profile_o=np.copy(P_profile)
             RE_po_o = np.copy(RE_po)

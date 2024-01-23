@@ -1,0 +1,14 @@
+ObjectType =  Image
+NDims =	   3
+ElementType = MET_INT
+ElementByteOrderMSB = False
+ElementNumberOfChannels = 1
+CompressedData = False
+
+DimSize =		2002 502 502
+ElementSize =	5e-05   5e-05   5e-05
+Offset =		 -5e-05   -5e-05   -5e-05
+ElementDataFile = sphere_stacking_500_500_2000_60_VElems.raw
+
+
+

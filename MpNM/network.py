@@ -46,13 +46,13 @@ class network(Base):
         Pores1   = np.loadtxt('test1D_node1.dat',skiprows=1, usecols=(0,1,2,3,4))
         #'''
 
-        Pores = Pores[Pores1[:, 4] > 0, :]  #
-        Pores1 = Pores1[Pores1[:, 4] > 0, :]  #
+        Pores = Pores[Pores1[:, 4] >= 0, :]  #
+        Pores1 = Pores1[Pores1[:, 4] >= 0, :]  #
         nonIsolatedPores = Pores[:, 0]
         newPore = np.zeros(len(Pores1[:, 0]))
         temp = np.arange(len(nonIsolatedPores))
 
-        newPore[Pores1[:, 4] > 0] = temp
+        newPore[Pores1[:, 4] >= 0] = temp
         inThroats = np.array(Throats1[:, 1] * Throats1[:, 2]) < 0
         outThroats = np.abs(Throats1[:, 1] * Throats1[:, 2]) < 1
         network = {}
