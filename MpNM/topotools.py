@@ -464,9 +464,12 @@ class topotools(Base):
                 layer[i][j][(network['throat.coords'][:, i] - index) > (j + 1) * step] = False
         return layer
 
-    def pore_health(self, network):
+    def pore_health(self, network,equal=False):
         pores_in_conns, counts = np.unique(network['throat.conns'], return_counts=True)
-        pores_in_conns = pores_in_conns[counts > 1]
+        if equal:
+            pores_in_conns = pores_in_conns[counts >= 1]
+        else:
+            pores_in_conns = pores_in_conns[counts > 1]
         pores = np.arange(len(network['pore.all']))
         single_pores = np.setdiff1d(pores, pores_in_conns, assume_unique=True)
 
