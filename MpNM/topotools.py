@@ -471,7 +471,7 @@ class topotools(Base):
         single_pores = np.setdiff1d(pores, pores_in_conns, assume_unique=True)
 
         health = {}
-        health['single_pore'] = single_pores.tolist()
+        health['single_pore'] = single_pores
         health['single_throat'] = []
 
         return health

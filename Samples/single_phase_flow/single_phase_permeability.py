@@ -67,9 +67,14 @@ throat_outlet1 = Throats1[Throats1[:, 1] == 0]
 
 throat_inlet_cond = topotools().Boundary_cond_cal(pn, throat_inlet1, throat_inlet2, fluid, newPore, Pores)
 throat_outlet_cond = topotools().Boundary_cond_cal(pn, throat_outlet1, throat_outlet2, fluid, newPore, Pores)
+throat_inlet_cond=throat_inlet_cond[np.isin(throat_inlet_cond[:, 0],  health['single_pore'])==False]
+throat_outlet_cond=throat_outlet_cond[np.isin(throat_outlet_cond[:, 0],  health['single_pore'])==False]
+print(np.count_nonzero(np.isin(throat_inlet_cond[:, 0],  health['single_pore'])))
+print(np.count_nonzero(np.isin(throat_outlet_cond[:, 0],  health['single_pore'])))
 bound_cond = {}
 bound_cond['throat_inlet_cond'] = throat_inlet_cond
 bound_cond['throat_outlet_cond'] = throat_outlet_cond
+
 
 model_res = []
 Boundary_condition_P = {}
@@ -82,7 +87,8 @@ Profile = algorithm().stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, res
 delta_p = np.array([Profile[k[1]] - Profile[k[0]] for k in pn['throat.conns']])
 flux_Throat_profile = delta_p * coe_A
 Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 * 4 * pn['throat.real_shape_factor']
-output = topotools().calculate_mass_flow(pn, Boundary_condition_P, fluid, coe_A_P, Profile, 8)
+print(Profile)
+output = topotools().calculate_mass_flow(pn, Boundary_condition_P, coe_A_P, Profile, 8)
 abs_perm = output['pore.inlets'] / (
         Boundary_condition_P['pore_inlet']['pore.inlets'][0] - Boundary_condition_P['pore_outlet']['pore.outlets'][
     0])
