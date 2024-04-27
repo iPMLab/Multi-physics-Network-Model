@@ -83,7 +83,6 @@ Profile = algorithm().stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, res
 delta_p = np.array([Profile[k[1]] - Profile[k[0]] for k in pn['throat.conns']])
 flux_Throat_profile = delta_p * coe_A
 Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 * 4 * pn['throat.real_shape_factor']
-print(Profile)
 output = topotools().calculate_mass_flow(pn, Boundary_condition_P, coe_A_P, Profile, 8)
 abs_perm = output['pore.inlets'] / (
         Boundary_condition_P['pore_inlet']['pore.inlets'][0] - Boundary_condition_P['pore_outlet']['pore.outlets'][

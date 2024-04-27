@@ -10,7 +10,7 @@ import numpy as np
 from vtkmodules.vtkIOXML import vtkXMLPolyDataReader
 from vtkmodules.util import numpy_support
 from vtkmodules.util.numpy_support import vtk_to_numpy
-
+import pandas as pd
 # import vtkmodules.all as vtk
 # from vtkmodules.util.numpy_support import numpy_to_vtk
 from xml.etree import ElementTree as ET
@@ -25,20 +25,19 @@ class network(Base):
         pass
 
     def read_network(self, path=None, name=None):
-        lines = []
-        with open(path + '/' + name + '_node1.dat', "r") as f:
-            first_line = f.readline()
-        f.close()
-        a = (first_line.split())
-        # L = float(a[1])
-        # Area = float(a[2])*float(a[3])
-
-        # exit()
-
+        # load original numpy data
         Throats1 = np.loadtxt(path + '/' + name + "_link1.dat", skiprows=1)
         Throats2 = np.loadtxt(path + '/' + name + "_link2.dat")
-        Pores = np.loadtxt(path + '/' + name + "_node2.dat")
         Pores1 = np.loadtxt(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4))
+        Pores2 = np.loadtxt(path + '/' + name + "_node2.dat")
+        # convert numpy to pandas and conclude the throats and pores
+        Throats1=pd.DataFrame(data=Throats1,columns=['index','pore_1_index','pore_2_index','radius','shape_factor','total_length'])
+        Throats2=pd.DataFrame(data=Throats2,columns=['index','pore_1_index','pore_2_index','conduit_lengths_pore1','conduit_lengths_pore2','length','volume','clay_volume'])
+        Throats=pd.concat((Throats1,Throats2.loc[:,np.isin(Throats2.columns,Throats1.columns)==False]),axis=1)
+
+        Pores1=pd.DataFrame(data=Pores1,columns=['index','x','y','z','connection_number'])
+        Pores2=pd.DataFrame(data=Pores2,columns=['index','volume','radius','shape_factor','clay_volume'])
+        Pores=pd.concat((Pores1,Pores2.loc[:,np.isin(Pores2.columns,Pores1.columns)==False]),axis=1)
         '''
         Throats1 = np.loadtxt("test1D_link1.dat", skiprows=1)
         Throats2 = np.loadtxt("test1D_link2.dat")
@@ -46,63 +45,62 @@ class network(Base):
         Pores1   = np.loadtxt('test1D_node1.dat',skiprows=1, usecols=(0,1,2,3,4))
         #'''
 
-        Pores = Pores[Pores1[:, 4] >= 0, :]  #
-        Pores1 = Pores1[Pores1[:, 4] >= 0, :]  #
-        nonIsolatedPores = Pores[:, 0]
-        newPore = np.zeros(len(Pores1[:, 0]))
-        temp = np.arange(len(nonIsolatedPores))
-
-        newPore[Pores1[:, 4] >= 0] = temp
-        inThroats = np.array(Throats1[:, 1] * Throats1[:, 2]) < 0
-        outThroats = np.abs(Throats1[:, 1] * Throats1[:, 2]) < 1
+        # Pores = Pores[Pores1[:, 4] >= 0, :]  #
+        # Pores1 = Pores1[Pores1[:, 4] >= 0, :]  #
+        Pores=Pores[Pores.loc[:,'connection_number']>=0]
+        nonIsolatedPores = Pores.loc[:, 'index'].to_numpy()
+        newPores=np.arange(len(Pores.loc[:, 'index']))
+        # inThroats = np.array(Throats1[:, 1] * Throats1[:, 2]) < 0
+        # outThroats = np.abs(Throats1[:, 1] * Throats1[:, 2]) < 1
+        inThroats=(Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index']==-1).to_numpy()
+        outThroats=(Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index']==0).to_numpy()
         network = {}
         nP = len(nonIsolatedPores)
         nT = len(Throats1)
-        network['pore._id'] = temp
-        network['pore.label'] = nonIsolatedPores - 1
-        network['pore.all'] = np.ones(nP).astype(bool)
-        network['pore.volume'] = Pores[:, 1]
-        network['pore.radius'] = Pores[:, 2]
+        network['pore._id'] = newPores
+        network['pore.label'] = newPores
+        oldPores = nonIsolatedPores - 1
+        network['pore.all'] = np.ones(nP,dtype=bool)
+        network['pore.volume'] = Pores.loc[:, 'volume'].to_numpy()
+        network['pore.radius'] = Pores.loc[:, 'radius'].to_numpy()
 
-        network['pore.shape_factor'] = Pores[:, 3]
-        network['pore.clay_volume'] = Pores[:, 3]
-        network['pore.coords'] = Pores1[:, 1:4]
-        network['throat._id'] = Throats1[:, 0]
-        network['throat.label'] = Throats1[:, 0]
-        network['throat.all'] = np.ones(nT).astype(bool)
+        network['pore.shape_factor'] = Pores.loc[:, 'shape_factor'].to_numpy()
+        network['pore.clay_volume'] = Pores.loc[:, 'clay_volume'].to_numpy()
+        network['pore.coords'] = Pores.loc[:, ['x','y','z']].to_numpy()
+        network['throat._id'] = Throats.loc[:, 'index'].to_numpy()
+        network['throat.label'] = Throats.loc[:, 'index'].to_numpy()
+        network['throat.all'] = np.ones(nT,dtype=bool)
         # network['throat.inlets']=inThroats
         # network['throat.outlets']=outThroats
 
         network['throat.inside'] = ~(inThroats | outThroats)
-        network['throat.shape_factor'] = Throats1[:, 0]
-        throat_conns = Throats1[:, 1:3] - [1, 1]
-        throat_conns[throat_conns[:, 0] > throat_conns[:, 1]] = (throat_conns[:, [1, 0]])[
-            throat_conns[:, 0] > throat_conns[:, 1]]
+        # network['throat.shape_factor'] = Throats1[:, 0]
+        # network['throat.shape_factor']=Throats.loc[:,'shape_factor'].to_numpy()
+        throat_conns = (Throats.loc[:, ['pore_1_index','pore_2_index']] - [1, 1]).to_numpy()
+        throat_conns[throat_conns[:, 0] > throat_conns[:, 1]] = throat_conns[:, [1, 0]][throat_conns[:, 0] > throat_conns[:, 1]] # make throat_conns first < second
         throat_out_in = throat_conns[(throat_conns[:, 0] < 0)]
-        index = np.digitize(throat_out_in[:, 1], network['pore.label']) - 1
+        index = np.digitize(throat_out_in[:, 1], oldPores) - 1
         throat_out_in[:, 1] = network['pore._id'][index]
         throat_internal = throat_conns[(throat_conns[:, 0] >= 0)]
-        index = np.digitize(throat_internal[:, 0], network['pore.label']) - 1
+        index = np.digitize(throat_internal[:, 0], oldPores) - 1
         throat_internal[:, 0] = network['pore._id'][index]
-        index = np.digitize(throat_internal[:, 1], network['pore.label']) - 1
+        index = np.digitize(throat_internal[:, 1], oldPores) - 1
         throat_internal[:, 1] = network['pore._id'][index]
         network['throat.conns'] = np.concatenate((throat_out_in, throat_internal), axis=0).astype(np.int64)
-        network['pore.label'] = temp
+
         network['pore.inlets'] = ~np.copy(network['pore.all'])
         network['pore.inlets'][
             np.array(network['throat.conns'][network['throat.conns'][:, 0] == -2][:, 1]).astype(int)] = True
         network['pore.outlets'] = ~np.copy(network['pore.all'])
         network['pore.outlets'][
             np.array(network['throat.conns'][network['throat.conns'][:, 0] == -1][:, 1]).astype(int)] = True
-        network['throat.radius'] = Throats1[:, 3]
-        network['throat.shape_factor'] = Throats1[:, 4]
-        network['throat.length'] = Throats2[:, 5]
-        network['throat.total_length'] = Throats1[:, 5]
-        network['throat.conduit_lengths_pore1'] = Throats2[:, 3]
-
-        network['throat.conduit_lengths_pore2'] = Throats2[:, 4]
-
-        network['throat.conduit_lengths_throat'] = Throats2[:, 5]
+        network['throat.radius'] = Throats.loc[:, 'radius'].to_numpy()
+        network['throat.shape_factor'] = Throats.loc[:, 'shape_factor'].to_numpy()
+        network['throat.length'] = Throats.loc[:, 'length'].to_numpy()
+        network['throat.total_length'] = Throats.loc[:, 'total_length'].to_numpy()
+        network['throat.conduit_lengths_pore1'] = Throats2.loc[:, 'conduit_lengths_pore1'].to_numpy()
+        network['throat.conduit_lengths_pore2'] = Throats2.loc[:, 'conduit_lengths_pore2'].to_numpy()
+        network['throat.conduit_lengths_throat'] = Throats2.loc[:, 'length'].to_numpy()
 
         BndG1 = (np.sqrt(3) / 36 + 0.00001)
         BndG2 = 0.07
@@ -196,6 +194,9 @@ class network(Base):
 
     def network2vtk(self, network, filename="test.vtp",
                     fill_nans=None, fill_infs=None):
+        '''
+        from openpnm
+        '''
         _TEMPLATE = """
         <?xml version="1.0" ?>
         <VTKFile byte_order="LittleEndian" type="PolyData" version="0.1">
@@ -279,3 +280,7 @@ class network(Base):
             f.seek(0)
             # consider adding header: '<?xml version="1.0"?>\n'+
             f.write(string)
+
+if __name__=='__main__':
+    path='../Samples/heat_transfer/pore_network'
+    network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
