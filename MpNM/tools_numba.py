@@ -54,13 +54,13 @@ def find_neighbor_ball_nb(network_pore_void, network_pore_solid, network_throat_
 
 @nb.njit(parallel=False, cache=True, fastmath=True, nogil=True)
 def find_neighbor_ball_information_nb(pore_throat_conns, start2end, a):
-    if start2end[a][0] == -1:
+    if start2end[a,0] == -1:
         void = np.array([[-1]])
         solid = np.array([[-1]])
         interface = np.array([[-1]])
         return [void, solid, interface]
     else:
-        pore_throat_conns_i = pore_throat_conns[start2end[a][0]:start2end[a][1]]
+        pore_throat_conns_i = pore_throat_conns[start2end[a,0]:start2end[a,1]]
         void = pore_throat_conns_i[pore_throat_conns_i[:, 3] == 0]
         solid = pore_throat_conns_i[pore_throat_conns_i[:, 3] == 1]
         interface = pore_throat_conns_i[pore_throat_conns_i[:, 3] == 2]

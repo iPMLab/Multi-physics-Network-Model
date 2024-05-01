@@ -16,9 +16,11 @@ from MpNM.network import network as net
 
 
 class algorithm(Base):
-    def stead_stay_alg_multi(self, network, fluid, coe_A, Boundary_condition, resolution, bound_cond):
-        num_pore = len(network.pores())
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+    
+    @staticmethod
+    def stead_stay_alg_multi(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
+        num_pore = len(pn.pores())
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                        shape=(num_pore, num_pore), dtype=np.float64).tocsr()
         A = (A.T + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
@@ -26,7 +28,7 @@ class algorithm(Base):
 
         # B=A.toarray()
         # mean_gil=np.max(coe_A)
-        # condctivity=H_P_fun(network['pore.radius'],resolution,fluid['visocity'])
+        # condctivity=H_P_fun(pn['pore.radius'],resolution,fluid['visocity'])
         def diffusion_coe_SO3(r, T, M1, M2, p, l):
             F_l = 2e-10 * T / p
             coe1 = 0.97 * r * (T / M1) ** 0.5
@@ -41,10 +43,10 @@ class algorithm(Base):
 
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
-                condctivity = diffusion_coe_SO3(network['pore.radius'], fluid['temperature'], 56, 28, 1, resolution)
+                condctivity = diffusion_coe_SO3(pn['pore.radius'], fluid['temperature'], 56, 28, 1, resolution)
                 if bound_cond == False:
                     bound_cond = {}
-                    index = np.argwhere(network[n] == True)
+                    index = np.argwhere(pn[n] == True)
                     value = condctivity[index]
                     bound_cond['throat_inlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
                     bound_cond['throat_outlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
@@ -57,11 +59,11 @@ class algorithm(Base):
 
                     throat_outlet_cond = bound_cond['throat_outlet_cond']
 
-                # area_i=(imsize*resolution)**2/sum(network['pore.radius'][network[n]]**2*np.pi)
-                condctivity = diffusion_coe_SO3(network['pore.radius'], fluid['temperature'], 56, 28, 1, resolution)  ##
+                # area_i=(imsize*resolution)**2/sum(pn['pore.radius'][pn[n]]**2*np.pi)
+                condctivity = diffusion_coe_SO3(pn['pore.radius'], fluid['temperature'], 56, 28, 1, resolution)  ##
                 if 'solid' in m:
-                    dig[network[n]] += condctivity[network[n]]
-                    b[network[n]] -= Boundary_condition[m][n][0] * condctivity[network[n]]
+                    dig[pn[n]] += condctivity[pn[n]]
+                    b[pn[n]] -= Boundary_condition[m][n][0] * condctivity[pn[n]]
                 elif 'pore' in m:
                     if 'inlet' in m:
                         condctivity[throat_inlet_cond[:, 0].astype(int)] = throat_inlet_cond[:,
@@ -81,23 +83,24 @@ class algorithm(Base):
         Profile = pp.spsolve(A, b)
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
-
-    def stead_stay_alg(self, network, fluid, coe_A, Boundary_condition, resolution, bound_cond):
-        num_pore = len(network['pore.all'])
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+    
+    @staticmethod
+    def stead_stay_alg(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
+        num_pore = len(pn['pore.all'])
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                        shape=(num_pore, num_pore), dtype=np.float64).tocsr()
         A = (A.T + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
         # B=A.toarray()
         # mean_gil=np.max(coe_A)
-        # condctivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])
+        # condctivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
-                condctivity = tool().H_P_fun(network['pore.radius'], resolution, network['pore.viscosity'])  ##
+                condctivity = tool().H_P_fun(pn['pore.radius'], resolution, pn['pore.viscosity'])  ##
                 if bound_cond == False:
                     bound_cond = {}
-                    index = np.argwhere(network[n] == True)
+                    index = np.argwhere(pn[n] == True)
                     value = condctivity[index]
                     bound_cond['throat_inlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
                     bound_cond['throat_outlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
@@ -109,11 +112,11 @@ class algorithm(Base):
 
                     throat_outlet_cond = bound_cond['throat_outlet_cond']
 
-                # area_i=(imsize*resolution)**2/sum(network['pore.radius'][network[n]]**2*np.pi)
+                # area_i=(imsize*resolution)**2/sum(pn['pore.radius'][pn[n]]**2*np.pi)
 
                 if 'solid' in m:
-                    dig[network[n]] += condctivity[network[n]]
-                    b[network[n]] -= Boundary_condition[m][n][0] * condctivity[network[n]]
+                    dig[pn[n]] += condctivity[pn[n]]
+                    b[pn[n]] -= Boundary_condition[m][n][0] * condctivity[pn[n]]
                 elif 'pore' in m:
                     if 'inlet' in m:
                         if Boundary_condition[m][n][1] == 'Dirichlet':
@@ -125,7 +128,7 @@ class algorithm(Base):
                         elif Boundary_condition[m][n][1] == 'Neumann':
                             dig[throat_inlet_cond[:, 0].astype(int)] += 0
                             b[throat_inlet_cond[:, 0].astype(int)] -= Boundary_condition[m][n][0] * \
-                                                                      network['pore.radius'][network[n]] ** 2 * np.pi
+                                                                      pn['pore.radius'][pn[n]] ** 2 * np.pi
 
                     elif 'outlet' in m:
                         if Boundary_condition[m][n][1] == 'Dirichlet':
@@ -143,10 +146,11 @@ class algorithm(Base):
         Profile = pp.spsolve(A, b)
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
-
-    def correct_pressure(self, network, coe_A, Boundary_condition, resolution, S_term=False):
-        num_pore = len(network['pore.all'])
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+    
+    @staticmethod
+    def correct_pressure(pn, coe_A, Boundary_condition, resolution, S_term=False):
+        num_pore = len(pn['pore.all'])
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                        shape=(num_pore, num_pore), dtype=np.float64).tocsr()
         A = (A.T + A).tolil()
         dig = -np.array(A.sum(axis=0)).reshape(num_pore)
@@ -158,21 +162,22 @@ class algorithm(Base):
         Profile = pp.spsolve(A, b)
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
-
-    def stead_stay_alg_convection(self, network, coe_A, coe_A_i, coe_B, Boundary_condition, g_ij, P_profile, fluid,
+    
+    @staticmethod
+    def stead_stay_alg_convection(pn, coe_A, coe_A_i, coe_B, Boundary_condition, g_ij, P_profile, fluid,
                                   solid, imsize, resolution, side):
 
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = num_node // 25000
         Num = 2 if Num < 2 else Num
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
 
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
@@ -180,58 +185,58 @@ class algorithm(Base):
         dig = np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         # B=A.toarray()
-        # resulation=np.average(network['throat.length'])
+        # resulation=np.average(pn['throat.length'])
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * solid['lambda'] * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * solid['lambda'] * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Neumann':
                         value = imsize[0] * imsize[1] * resolution ** 2 / np.sum(
-                            network['pore.radius'][network['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                            pn['pore.radius'][pn['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 / (
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 / (
                                 resolution / solid['lambda'] + resolution / fluid['lambda'])
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
 
                 elif 'pore' in m:
-                    # P_conductivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])##
-                    # mass_calcu=lambda i:tool().mass_balance_conv(network,g_ij,P_profile,i)
-                    P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile,
-                                                              network['pore._id'][network[n] & network['pore.void']])
+                    # P_conductivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])##
+                    # mass_calcu=lambda i:tool().mass_balance_conv(pn,g_ij,P_profile,i)
+                    P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile,
+                                                              pn['pore._id'][pn[n] & pn['pore.void']])
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * fluid['lambda'] * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * fluid['lambda'] * pn['pore.radius'] ** 2 / resolution
                     if 'inlet' in m:
                         convection_term = fluid['density'] * fluid['Cp'] * abs(
-                            P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
-                        diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                            P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
+                        diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                         tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
 
-                        tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                        tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                     else:
                         tem_b = 0
 
                         tem_dig = fluid['density'] * fluid['Cp'] * abs(
-                            P_conductivity)  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
-                    dig[network[n] & network['pore.void']] -= tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                            P_conductivity)  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
+                    dig[pn[n] & pn['pore.void']] -= tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
             # boundary condition set shuold be discussed
         # t0 = time.time()
         A_c = A  # copy A
         # T_res=[]
-        # Phase= op.phases.Water(network=network)
+        # Phase= op.phases.Water(pn=pn)
 
         # _----------------------------steady-state-------------------------------#
 
@@ -240,91 +245,92 @@ class algorithm(Base):
         # Tem_c,j=ssl.bicgstab(A_c,b,tol=1e-8)
         Tem_c = pp.spsolve(A_c, b)
         return Tem_c
-
-    def stead_stay_model_tes(self, network, coe_A, coe_A_i, coe_B,
+    
+    @staticmethod
+    def stead_stay_model_tes(pn, coe_A, coe_A_i, coe_B,
                              Boundary_condition, x0, g_ij, P_profile,
                              imsize, resolution, side, S_term=False,
                              type_f='species'):
 
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
         if type_f == 'species':
-            alpha = network['pore.density'] * 0 + 1
-            cond = network['pore.diffusivity']
+            alpha = pn['pore.density'] * 0 + 1
+            cond = pn['pore.diffusivity']
         elif type_f == 'heat':
-            alpha = network['pore.density'] * network['pore.Cp']
-            cond = network['pore.lambda']
+            alpha = pn['pore.density'] * pn['pore.Cp']
+            cond = pn['pore.lambda']
         elif type_f == 'momentum':
-            alpha = network['pore.density']
-            cond = network['pore.viscosity']
+            alpha = pn['pore.density']
+            cond = pn['pore.viscosity']
         elif type_f == 'density':
-            alpha = network['pore.density'] * 0 + 1
-            cond = network['pore.diffusivity'] * 0
-            # dig,b=self.setting_Boundary_condition(network,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
+            alpha = pn['pore.density'] * 0 + 1
+            cond = pn['pore.diffusivity'] * 0
+            # dig,b=algorithm.setting_Boundary_condition(pn,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
         dig = -np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * cond * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * cond * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Neumann':
-                        value = net().getting_zoom_value(network, side, imsize, resolution)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        value = net.getting_zoom_value(pn, side, imsize, resolution)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 / (resolution / cond)
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 / (resolution / cond)
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                 elif 'pore' in m:
-                    # P_conductivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])##
-                    P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile,
-                                                              network['pore._id'][network[n] & network['pore.void']])
+                    # P_conductivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])##
+                    P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile,
+                                                              pn['pore._id'][pn[n] & pn['pore.void']])
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * cond * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * cond * pn['pore.radius'] ** 2 / resolution
 
                         if 'inlet' in m:
-                            convection_term = abs(alpha[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
+                            convection_term = abs(alpha[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
 
-                            diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                            diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                             tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
-                            tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                            tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                         else:
                             tem_b = 0
-                            tem_dig = abs(alpha[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
+                            tem_dig = abs(alpha[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
                     elif Boundary_condition[m][n][1] == 'Neumann':
                         if 'inlet' in m:
                             tem_dig = 0
-                            tem_b = Boundary_condition[m][n][0] * network['pore.radius'][
-                                network[n] & network['pore.void']] ** 2 * np.pi
+                            tem_b = Boundary_condition[m][n][0] * pn['pore.radius'][
+                                pn[n] & pn['pore.void']] ** 2 * np.pi
                         else:
-                            tem_dig = abs(alpha[network[n] & network['pore.void']] * P_conductivity)
+                            tem_dig = abs(alpha[pn[n] & pn['pore.void']] * P_conductivity)
                             tem_b = 0
-                    dig[network[n] & network['pore.void']] += tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                    dig[pn[n] & pn['pore.void']] += tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
 
         A_c = A.copy()  # copy A
 
@@ -332,7 +338,7 @@ class algorithm(Base):
 
         # Var_c=np.copy(x0)
 
-        # delta_dig=alpha*network['pore.volume']/delta_t
+        # delta_dig=alpha*pn['pore.volume']/delta_t
         dig_c = np.copy(dig)
 
         # diagonal should update for delta_t
@@ -342,7 +348,7 @@ class algorithm(Base):
         b_c = np.copy(b) + S_term
         test = A.sum(axis=0)
 
-        if np.count_nonzero(test) == len(network['pore._id']):
+        if np.count_nonzero(test) == len(pn['pore._id']):
             Var_c = pp.spsolve(A_c, b_c)
         else:
             Var_c, j = ssl.bicg(A_c, b_c, tol=1e-9)
@@ -350,19 +356,20 @@ class algorithm(Base):
 
         return Var_c
 
-    def transient_temperature(self, network, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
+    @staticmethod
+    def transient_temperature(pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
                               solid, imsize, resolution, time_step, delta_t, side, Phase):
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = num_node // 25000
         Num = 2 if Num < 2 else Num
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
 
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
@@ -370,94 +377,95 @@ class algorithm(Base):
         dig = np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         # B=A.toarray()
-        # resulation=np.average(network['throat.length'])
+        # resulation=np.average(pn['throat.length'])
 
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * solid['lambda'] * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * solid['lambda'] * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Neumann':
                         value = imsize[0] * imsize[1] * resolution ** 2 / np.sum(
-                            network['pore.radius'][network['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                            pn['pore.radius'][pn['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 / (
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 / (
                                 resolution / solid['lambda'] + resolution / fluid['lambda'])
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                 elif 'pore' in m:
-                    # P_conductivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])##
-                    P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile, network['pore._id'])
+                    # P_conductivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])##
+                    P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile, pn['pore._id'])
 
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * fluid['lambda'] * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * fluid['lambda'] * pn['pore.radius'] ** 2 / resolution
                     if 'inlet' in m:
-                        convection_term = fluid['density'] * fluid['Cp'] * abs(P_conductivity[network[n] & network[
-                            'pore.void']])  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
-                        diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                        convection_term = fluid['density'] * fluid['Cp'] * abs(P_conductivity[pn[n] & pn[
+                            'pore.void']])  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
+                        diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                         tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
 
-                        tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                        tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                     else:
                         tem_b = 0
 
-                        tem_dig = fluid['density'] * fluid['Cp'] * abs(P_conductivity[network[n] & network[
-                            'pore.void']])  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
-                    dig[network[n] & network['pore.void']] -= tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                        tem_dig = fluid['density'] * fluid['Cp'] * abs(P_conductivity[pn[n] & pn[
+                            'pore.void']])  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
+                    dig[pn[n] & pn['pore.void']] -= tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
             # boundary condition set shuold be discussed
         # t0 = time.time()
         A_c = A  # copy A
         # T_res=[]
-        # Phase= op.phases.Water(network=network)
+        # Phase= op.phases.Water(pn=pn)
 
         # _----------------------------steady-state-------------------------------#
         T_res = []
-        # Phase= op.phases.Water(network=network)
+        # Phase= op.phases.Water(pn=pn)
 
         for i in np.arange(time_step):
-            delta_dig = fluid['density'] * fluid['Cp'] * network['pore.volume'] / delta_t * network['pore.void'] + \
-                        solid['density'] * solid['Cp'] * network['pore.volume'] / delta_t * network['pore.solid']
-            dig_c = dig - delta_dig  # fluid_density*fluid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.void']-solid_density*solid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.solid']
+            delta_dig = fluid['density'] * fluid['Cp'] * pn['pore.volume'] / delta_t * pn['pore.void'] + \
+                        solid['density'] * solid['Cp'] * pn['pore.volume'] / delta_t * pn['pore.solid']
+            dig_c = dig - delta_dig  # fluid_density*fluid_Cp*pn['pore.radius']**3*4/3/delta_t*pn['pore.void']-solid_density*solid_Cp*pn['pore.radius']**3*4/3/delta_t*pn['pore.solid']
             # diagonal should update for delta_t
             A_c.setdiag(-dig_c, 0)  # add diagonal into A_c
             A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
             b_c = b + delta_dig * x0
-            # fluid_density*fluid_Cp*network['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
+            # fluid_density*fluid_Cp*pn['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
             # Tem_c,j=ssl.bicg(A_c,b_c,tol=1e-9) # calculate the temperature profile
             Tem_c = pp.spsolve(A_c, b_c)
             x0 = Tem_c.astype(np.float16)  # update
             T_res.append(Tem_c)
             print(max(Tem_c), min(Tem_c))
             Phase['pore.temperature'] = Tem_c
-            op.io.VTK.export_data(network=network, phases=Phase, filename='./_{}'.format(i))
+            op.io.VTK.export_data(pn=pn, phases=Phase, filename='./_{}'.format(i))
         return T_res
 
-    def transient_temperature_single(self, network, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile,
+    @staticmethod
+    def transient_temperature_single(pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile,
                                      fluid, solid, imsize, resolution, delta_t, side):
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = min((num_node // 25000) + 1, 10)
         # Num=2 if Num <2 else Num
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
 
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
@@ -465,71 +473,71 @@ class algorithm(Base):
         dig = np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         # B=A.toarray()
-        # resulation=np.average(network['throat.length'])
+        # resulation=np.average(pn['throat.length'])
 
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * solid['lambda'] * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * solid['lambda'] * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Neumann':
                         value = imsize[0] * imsize[1] * resolution ** 2 / np.sum(
-                            network['pore.radius'][network['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                            pn['pore.radius'][pn['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 / (
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 / (
                                 resolution / solid['lambda'] + resolution / fluid['lambda'])
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        b[network[n] & network['pore.solid']] += b_dig
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b[pn[n] & pn['pore.solid']] += b_dig
                 elif 'pore' in m:
-                    # P_conductivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])##
-                    P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile,
-                                                              network['pore._id'][network[n] & network['pore.void']])
+                    # P_conductivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])##
+                    P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile,
+                                                              pn['pore._id'][pn[n] & pn['pore.void']])
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * fluid['lambda'] * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * fluid['lambda'] * pn['pore.radius'] ** 2 / resolution
                     if 'inlet' in m:
                         convection_term = fluid['density'] * fluid['Cp'] * abs(
-                            P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
-                        diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                            P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
+                        diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                         tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
 
-                        tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                        tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                     else:
                         tem_b = 0
 
                         tem_dig = fluid['density'] * fluid['Cp'] * abs(
-                            P_conductivity)  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
-                    dig[network[n] & network['pore.void']] -= tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                            P_conductivity)  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
+                    dig[pn[n] & pn['pore.void']] -= tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
             # boundary condition set shuold be discussed
         # t0 = time.time()
         A_c = A.copy()  # copy A
         # T_res=[]
-        # Phase= op.phases.Water(network=network)
+        # Phase= op.phases.Water(pn=pn)
 
         # _----------------------------steady-state-------------------------------#
         T_res = []
-        # Phase= op.phases.Water(network=network)
+        # Phase= op.phases.Water(pn=pn)
 
-        delta_dig = fluid['density'] * fluid['Cp'] * network['pore.volume'] / delta_t * network['pore.void'] + solid[
-            'density'] * solid['Cp'] * network['pore.volume'] / delta_t * network['pore.solid']
-        dig_c = dig - delta_dig  # fluid_density*fluid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.void']-solid_density*solid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.solid']
+        delta_dig = fluid['density'] * fluid['Cp'] * pn['pore.volume'] / delta_t * pn['pore.void'] + solid[
+            'density'] * solid['Cp'] * pn['pore.volume'] / delta_t * pn['pore.solid']
+        dig_c = dig - delta_dig  # fluid_density*fluid_Cp*pn['pore.radius']**3*4/3/delta_t*pn['pore.void']-solid_density*solid_Cp*pn['pore.radius']**3*4/3/delta_t*pn['pore.solid']
         # diagonal should update for delta_t
         A_c.setdiag(-dig_c, 0)  # add diagonal into A_c
         A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = b + delta_dig * x0
-        # fluid_density*fluid_Cp*network['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
+        # fluid_density*fluid_Cp*pn['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
         # Tem_c,j=ssl.bicg(A_c,b_c,tol=1e-9) # calculate the temperature profile
         Tem_c = pp.spsolve(A_c, b_c)
         x0 = Tem_c.astype(np.float16)  # update
@@ -537,19 +545,20 @@ class algorithm(Base):
         # print(max(Tem_c),min(Tem_c))
 
         return Tem_c
-
-    def transient_temperature_s(self, network, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
+    
+    @staticmethod
+    def transient_temperature_s(pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
                                 solid, imsize, resolution, delta_t, side):
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = (num_node // 25000) + 1
         # Num=2 if Num <2 else Num
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
@@ -557,29 +566,29 @@ class algorithm(Base):
         dig = -np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         # B=A.toarray()
-        # resulation=np.average(network['throat.length'])
-        dig, b = self.setting_Boundary_condition(network, g_ij, P_profile, dig, b, Boundary_condition, resolution,
+        # resulation=np.average(pn['throat.length'])
+        dig, b = algorithm.setting_Boundary_condition(pn, g_ij, P_profile, dig, b, Boundary_condition, resolution,
                                                  imsize, Num, side, 'heat')
 
         # boundary condition set shuold be discussed
         # t0 = time.time()
         A_c = A  # copy A
         # T_res=[]
-        # Phase= op.phases.Water(network=network)
+        # Phase= op.phases.Water(pn=pn)
 
         # _----------------------------steady-state-------------------------------#
         T_res = []
-        # Phase= op.phases.Water(network=network)
+        # Phase= op.phases.Water(pn=pn)
 
-        delta_dig = network['pore.density'] * network['pore.Cp'] * network['pore.volume'] / delta_t
-        dig_c = dig + delta_dig  # fluid_density*fluid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.void']-solid_density*solid_Cp*network['pore.radius']**3*4/3/delta_t*network['pore.solid']
+        delta_dig = pn['pore.density'] * pn['pore.Cp'] * pn['pore.volume'] / delta_t
+        dig_c = dig + delta_dig  # fluid_density*fluid_Cp*pn['pore.radius']**3*4/3/delta_t*pn['pore.void']-solid_density*solid_Cp*pn['pore.radius']**3*4/3/delta_t*pn['pore.solid']
 
         # diagonal should update for delta_t
         A_c.setdiag(dig_c, 0)  # add diagonal into A_c
         A_c = A_c.tocsr()  # we transfer A_c for next calculation
 
         b_c = b + delta_dig * x0
-        # fluid_density*fluid_Cp*network['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
+        # fluid_density*fluid_Cp*pn['pore.radius']**3*4/3*x0/delta_t #update b array for previous time step
         # Tem_c,j=ssl.bicg(A_c,b_c,tol=1e-9) # calculate the temperature profile
         Tem_c = pp.spsolve(A_c, b_c)
 
@@ -588,133 +597,135 @@ class algorithm(Base):
 
         return Tem_c
 
-    def setting_Boundary_condition(self, network, g_ij, P_profile, dig, b, Boundary_condition, resolution, imsize, Num,
+    @staticmethod
+    def setting_Boundary_condition(pn, g_ij, P_profile, dig, b, Boundary_condition, resolution, imsize, Num,
                                    side, type_f):
 
         if type_f == 'diffusion':
             alpha = 1
-            cond = network['pore.diffusivity']
+            cond = pn['pore.diffusivity']
         elif type_f == 'heat':
-            alpha = network['pore.density'] * network['pore.Cp']
-            cond = network['pore.lambda']
+            alpha = pn['pore.density'] * pn['pore.Cp']
+            cond = pn['pore.lambda']
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * cond * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
+                        T_conductivity_s = np.pi * cond * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
 
                     elif Boundary_condition[m][n][1] == 'Neumann':
-                        value = net().getting_zoom_value(network, side, imsize, resolution)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
+                        value = net.getting_zoom_value(pn, side, imsize, resolution)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * cond * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                    dig[network[n] & network['pore.solid']] += tem_dig
-                    b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * cond * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                    dig[pn[n] & pn['pore.solid']] += tem_dig
+                    b[pn[n] & pn['pore.solid']] += b_dig
                 elif 'pore' in m:
-                    # P_conductivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])##
-                    P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile,
-                                                              network['pore._id'][network[n] & network['pore.void']])
+                    # P_conductivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])##
+                    P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile,
+                                                              pn['pore._id'][pn[n] & pn['pore.void']])
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * cond * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * cond * pn['pore.radius'] ** 2 / resolution
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_f = np.pi * cond * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * cond * pn['pore.radius'] ** 2 / resolution
 
                     if 'inlet' in m:
 
-                        convection_term = abs(alpha[network[n] & network[
-                            'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
-                        diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                        convection_term = abs(alpha[pn[n] & pn[
+                            'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
+                        diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                         tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
-                        tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                        tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                     else:
                         tem_b = 0
-                        tem_dig = abs(alpha[network[n] & network[
-                            'pore.void']] * P_conductivity)  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
-                    dig[network[n] & network['pore.void']] += tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                        tem_dig = abs(alpha[pn[n] & pn[
+                            'pore.void']] * P_conductivity)  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
+                    dig[pn[n] & pn['pore.void']] += tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
         return dig, b
 
-    def transient_energy_s(self, network, coe_A, coe_A_i, coe_B,
+    @staticmethod
+    def transient_energy_s(pn, coe_A, coe_A_i, coe_B,
                            Boundary_condition, x0, g_ij,
                            P_profile, imsize, resolution,
                            delta_t, side, type_f='heat'):
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
-        alpha = network['pore.density'] * network['pore.Cp']
-        cond = network['pore.lambda']
-        alpha_ = network['pore.Cp']
-        # dig,b=self.setting_Boundary_condition(network,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
+        alpha = pn['pore.density'] * pn['pore.Cp']
+        cond = pn['pore.lambda']
+        alpha_ = pn['pore.Cp']
+        # dig,b=algorithm.setting_Boundary_condition(pn,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
         dig = -np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * cond * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * cond * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Neumann':
-                        value = net().getting_zoom_value(network, side, imsize, resolution)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        value = net.getting_zoom_value(pn, side, imsize, resolution)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 / (resolution / cond)
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 / (resolution / cond)
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                 elif 'pore' in m:
-                    # P_conductivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])##
-                    P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile,
-                                                              network['pore._id'][network[n] & network['pore.void']])
+                    # P_conductivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])##
+                    P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile,
+                                                              pn['pore._id'][pn[n] & pn['pore.void']])
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * cond * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * cond * pn['pore.radius'] ** 2 / resolution
 
                         if 'inlet' in m:
-                            convection_term = abs(alpha_[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
+                            convection_term = abs(alpha_[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
 
-                            diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                            diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                             tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
-                            tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                            tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                         else:
                             tem_b = 0
-                            tem_dig = abs(alpha_[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
+                            tem_dig = abs(alpha_[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
                     elif Boundary_condition[m][n][1] == 'Neumann':
 
                         if 'inlet' in m:
                             tem_dig = 0
-                            tem_b = Boundary_condition[m][n][0] * network['pore.radius'][
-                                network[n] & network['pore.void']] ** 2 * np.pi
+                            tem_b = Boundary_condition[m][n][0] * pn['pore.radius'][
+                                pn[n] & pn['pore.void']] ** 2 * np.pi
                         else:
-                            tem_dig = abs(alpha_[network[n] & network['pore.void']] * P_conductivity)
+                            tem_dig = abs(alpha_[pn[n] & pn['pore.void']] * P_conductivity)
                             tem_b = 0
-                    dig[network[n] & network['pore.void']] += tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                    dig[pn[n] & pn['pore.void']] += tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
 
         A_c = A.copy()  # copy A
 
@@ -722,7 +733,7 @@ class algorithm(Base):
 
         # Var_c=np.copy(x0)
 
-        delta_dig = alpha * network['pore.volume'] / delta_t
+        delta_dig = alpha * pn['pore.volume'] / delta_t
         dig_c = dig + delta_dig
 
         # diagonal should update for delta_t
@@ -736,99 +747,100 @@ class algorithm(Base):
 
         return Var_c
 
-    def transient_model_test(self, network, coe_A, coe_A_i, coe_B,
+    @staticmethod
+    def transient_model_test(pn, coe_A, coe_A_i, coe_B,
                              Boundary_condition, x0, g_ij, P_profile,
                              imsize, resolution, delta_t, side, mass_flow=False, S_term=False,
                              Bound_cond_P=False, type_f='species'):
         # func_pv=lambda c,T:8.314*T*c
         # func_ps=lambda T:611.21*np.exp((18.678-(T-273.15)/234.5)*((T-273.15)/(257.14+(T-273.15))))
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
         # RH= func_pv(1.0,302)/func_ps(302)
         # Bound_c=HAProps('C', 'T', 302, 'P', (1e5+400)/1000,'R',RH)*1000*1.29
         if type_f == 'species':
-            alpha = network['pore.density'] * 0 + 1
-            cond = network['pore.diffusivity']
+            alpha = pn['pore.density'] * 0 + 1
+            cond = pn['pore.diffusivity']
         elif type_f == 'heat':
-            alpha = network['pore.density'] * network['pore.Cp']
-            cond = network['pore.lambda']
+            alpha = pn['pore.density'] * pn['pore.Cp']
+            cond = pn['pore.lambda']
         elif type_f == 'momentum':
-            alpha = network['pore.density']
-            cond = network['pore.viscosity']
+            alpha = pn['pore.density']
+            cond = pn['pore.viscosity']
         elif type_f == 'density':
-            alpha = network['pore.density'] * 0 + 1
-            cond = network['pore.diffusivity'] * 0
-            # dig,b=self.setting_Boundary_condition(network,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
+            alpha = pn['pore.density'] * 0 + 1
+            cond = pn['pore.diffusivity'] * 0
+            # dig,b=algorithm.setting_Boundary_condition(pn,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
         dig = -np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * cond * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * cond * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Neumann':
-                        value = net().getting_zoom_value(network, side, imsize, resolution)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        value = net.getting_zoom_value(pn, side, imsize, resolution)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 / (resolution / cond)
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 / (resolution / cond)
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                 elif 'pore' in m:
 
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * cond * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * cond * pn['pore.radius'] ** 2 / resolution
                         if Bound_cond_P:
-                            P_g_ij = tool().H_P_fun(network['pore.radius'], resolution, network['pore.viscosity'])  ##
-                            P_conductivity = (Bound_cond_P[m][n][0] - P_profile[network[n] & network['pore.void']]) * \
-                                             P_g_ij[network[n] & network['pore.void']]
+                            P_g_ij = tool().H_P_fun(pn['pore.radius'], resolution, pn['pore.viscosity'])  ##
+                            P_conductivity = (Bound_cond_P[m][n][0] - P_profile[pn[n] & pn['pore.void']]) * \
+                                             P_g_ij[pn[n] & pn['pore.void']]
                         else:
-                            P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile, network['pore._id'][
-                                network[n] & network['pore.void']])
+                            P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile, pn['pore._id'][
+                                pn[n] & pn['pore.void']])
                         if 'inlet' in m:
 
-                            convection_term = np.abs(alpha[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
+                            convection_term = np.abs(alpha[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
 
-                            diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                            diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                             tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
-                            tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                            tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                         else:
                             tem_b = 0
-                            tem_dig = abs(alpha[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
+                            tem_dig = abs(alpha[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
                     elif Boundary_condition[m][n][1] == 'Neumann':
-                        P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile, network['pore._id'][
-                            network[n] & network['pore.void']])
+                        P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile, pn['pore._id'][
+                            pn[n] & pn['pore.void']])
                         if 'inlet' in m:
                             tem_dig = 0
-                            tem_b = Boundary_condition[m][n][0] * network['pore.radius'][
-                                network[n] & network['pore.void']] ** 2 * np.pi
+                            tem_b = Boundary_condition[m][n][0] * pn['pore.radius'][
+                                pn[n] & pn['pore.void']] ** 2 * np.pi
                         else:
-                            tem_dig = abs(alpha[network[n] & network['pore.void']] * P_conductivity)
+                            tem_dig = abs(alpha[pn[n] & pn['pore.void']] * P_conductivity)
                             tem_b = 0
-                    dig[network[n] & network['pore.void']] += tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                    dig[pn[n] & pn['pore.void']] += tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
 
         A_c = A.copy()  # copy A
 
@@ -836,7 +848,7 @@ class algorithm(Base):
 
         # Var_c=np.copy(x0)
 
-        delta_dig = alpha * network['pore.volume'] / delta_t
+        delta_dig = alpha * pn['pore.volume'] / delta_t
         dig_c = dig + delta_dig
 
         # diagonal should update for delta_t
@@ -852,88 +864,89 @@ class algorithm(Base):
         else:
             return Var_c
 
-    def transient_model(self, network, coe_A, coe_A_i, coe_B,
+    @staticmethod
+    def transient_model(pn, coe_A, coe_A_i, coe_B,
                         Boundary_condition, x0, g_ij, P_profile,
                         imsize, resolution, delta_t, side, type_f='species'):
 
-        num_node = len(network['pore.all'])
+        num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (network['throat.conns'][:, 0], network['throat.conns'][:, 1])),
+        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
                        shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (network['throat.conns'][:, 1], network['throat.conns'][:, 0])),
+        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                         shape=(num_node, num_node), dtype=np.float64).tocsr()
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
         if type_f == 'species':
-            alpha = network['pore.density'] * 0 + 1
-            cond = network['pore.diffusivity']
+            alpha = pn['pore.density'] * 0 + 1
+            cond = pn['pore.diffusivity']
         elif type_f == 'heat':
-            alpha = network['pore.density'] * network['pore.Cp']
-            cond = network['pore.lambda']
+            alpha = pn['pore.density'] * pn['pore.Cp']
+            cond = pn['pore.lambda']
         elif type_f == 'density':
-            alpha = network['pore.density'] * 0 + 1
-            cond = network['pore.diffusivity']
+            alpha = pn['pore.density'] * 0 + 1
+            cond = pn['pore.diffusivity']
 
-            # dig,b=self.setting_Boundary_condition(network,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
+            # dig,b=algorithm.setting_Boundary_condition(pn,g_ij,P_profile,dig,b,Boundary_condition,resolution,imsize,Num,side,'diffusion')
         dig = -np.array(A.sum(axis=0)).reshape(num_node)
         b = np.zeros(num_node)
         for m in Boundary_condition:
             for n in Boundary_condition[m]:
                 if 'solid' in m:
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_s = np.pi * cond * network['pore.radius'] ** 2 / resolution
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * cond * pn['pore.radius'] ** 2 / resolution
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Neumann':
-                        value = net().getting_zoom_value(network, side, imsize, resolution)
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 * value
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']] * 0
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] -= tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        value = net.getting_zoom_value(pn, side, imsize, resolution)
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 * value
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']] * 0
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] -= tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                     elif Boundary_condition[m][n][1] == 'Robin':
-                        T_conductivity_s = np.pi * network['pore.radius'] ** 2 / (resolution / cond)
-                        tem_dig = T_conductivity_s[network[n] & network['pore.solid']]
-                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[network[n] & network['pore.solid']]
-                        dig[network[n] & network['pore.solid']] += tem_dig
-                        b[network[n] & network['pore.solid']] += b_dig
+                        T_conductivity_s = np.pi * pn['pore.radius'] ** 2 / (resolution / cond)
+                        tem_dig = T_conductivity_s[pn[n] & pn['pore.solid']]
+                        b_dig = Boundary_condition[m][n][0] * T_conductivity_s[pn[n] & pn['pore.solid']]
+                        dig[pn[n] & pn['pore.solid']] += tem_dig
+                        b[pn[n] & pn['pore.solid']] += b_dig
                 elif 'pore' in m:
-                    # P_conductivity=H_P_fun(network['pore.radius'],resolution,fluid['viscosity'])##
-                    P_conductivity = tool().mass_balance_conv(network, g_ij, P_profile,
-                                                              network['pore._id'][network[n] & network['pore.void']])
+                    # P_conductivity=H_P_fun(pn['pore.radius'],resolution,fluid['viscosity'])##
+                    P_conductivity = tool().mass_balance_conv(pn, g_ij, P_profile,
+                                                              pn['pore._id'][pn[n] & pn['pore.void']])
                     if Boundary_condition[m][n][1] == 'Dirichlet':
-                        T_conductivity_f = np.pi * cond * network['pore.radius'] ** 2 / resolution
+                        T_conductivity_f = np.pi * cond * pn['pore.radius'] ** 2 / resolution
 
                         if 'inlet' in m:
-                            convection_term = abs(alpha[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[network[n]&network['pore.void']])
+                            convection_term = abs(alpha[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(Boundary_condition_P[m][n][0]-P_profile[pn[n]&pn['pore.void']])
 
-                            diffusion_term = T_conductivity_f[network[n] & network['pore.void']]
+                            diffusion_term = T_conductivity_f[pn[n] & pn['pore.void']]
                             tem_b = Boundary_condition[m][n][0] * (convection_term + diffusion_term)
-                            tem_dig = T_conductivity_f[network[n] & network['pore.void']]
+                            tem_dig = T_conductivity_f[pn[n] & pn['pore.void']]
                         else:
                             tem_b = 0
-                            tem_dig = abs(alpha[network[n] & network[
-                                'pore.void']] * P_conductivity)  # *(P_profile[network[n]&network['pore.void']]-Boundary_condition_P[m][n][0]))
+                            tem_dig = abs(alpha[pn[n] & pn[
+                                'pore.void']] * P_conductivity)  # *(P_profile[pn[n]&pn['pore.void']]-Boundary_condition_P[m][n][0]))
                     elif Boundary_condition[m][n][1] == 'Neumann':
 
                         if 'inlet' in m:
                             tem_dig = 0
-                            tem_b = Boundary_condition[m][n][0] * network['pore.radius'][
-                                network[n] & network['pore.void']] ** 2 * np.pi
+                            tem_b = Boundary_condition[m][n][0] * pn['pore.radius'][
+                                pn[n] & pn['pore.void']] ** 2 * np.pi
                         else:
-                            tem_dig = abs(alpha[network[n] & network['pore.void']] * P_conductivity)
+                            tem_dig = abs(alpha[pn[n] & pn['pore.void']] * P_conductivity)
                             tem_b = 0
-                    dig[network[n] & network['pore.void']] += tem_dig
-                    b[network[n] & network['pore.void']] += tem_b
+                    dig[pn[n] & pn['pore.void']] += tem_dig
+                    b[pn[n] & pn['pore.void']] += tem_b
 
         A_c = A.copy()  # copy A
 
@@ -941,7 +954,7 @@ class algorithm(Base):
 
         # Var_c=np.copy(x0)
 
-        delta_dig = alpha * network['pore.volume'] / delta_t
+        delta_dig = alpha * pn['pore.volume'] / delta_t
         dig_c = dig + delta_dig
 
         # diagonal should update for delta_t
@@ -955,7 +968,8 @@ class algorithm(Base):
 
         return Var_c
 
-    def RK4(self, h, a, a_max, initial):
+    @staticmethod
+    def RK4(h, a, a_max, initial):
         func_n = lambda T: 1 / (1 / 2.976 + 0.377 * (1 - 293.15 / T))  # n0=1,alph=0 for Langmuir-Freundirch
         func_b = lambda T: 4.002 * np.exp(51800 / 8.314 / 273.15 * (
                 293.15 / T - 1))  # b0=4.002, delta_E=65572,R=8.314,T0=273.15,for Langmuir-Freundirch

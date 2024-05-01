@@ -79,7 +79,7 @@ Boundary_condition_P['pore_outlet'] = {'pore.outlets': [0, 'Dirichlet']}
 
 coe_A = np.array(topotools().Mass_conductivity(pn)) / pn['throat.total_length']
 coe_A_P = coe_A
-Profile = algorithm().stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, resolution, bound_cond)
+Profile = algorithm.stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, resolution, bound_cond)
 delta_p = np.array([Profile[k[1]] - Profile[k[0]] for k in pn['throat.conns']])
 flux_Throat_profile = delta_p * coe_A
 Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 * 4 * pn['throat.real_shape_factor']

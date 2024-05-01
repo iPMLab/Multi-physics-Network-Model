@@ -24,7 +24,8 @@ class network(Base):
     def __init__(self):
         pass
 
-    def read_network(self, path=None, name=None):
+    @staticmethod
+    def read_network(path=None, name=None):
         # load original numpy data
         Throats1 = np.loadtxt(path + '/' + name + "_link1.dat", skiprows=1)
         Throats2 = np.loadtxt(path + '/' + name + "_link2.dat")
@@ -54,87 +55,89 @@ class network(Base):
         # outThroats = np.abs(Throats1[:, 1] * Throats1[:, 2]) < 1
         inThroats=(Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index']==-1).to_numpy()
         outThroats=(Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index']==0).to_numpy()
-        network = {}
+        pn = {}
         nP = len(nonIsolatedPores)
         nT = len(Throats1)
-        network['pore._id'] = newPores
-        network['pore.label'] = newPores
+        pn['pore._id'] = newPores
+        pn['pore.label'] = newPores
         oldPores = nonIsolatedPores - 1
-        network['pore.all'] = np.ones(nP,dtype=bool)
-        network['pore.volume'] = Pores.loc[:, 'volume'].to_numpy()
-        network['pore.radius'] = Pores.loc[:, 'radius'].to_numpy()
+        pn['pore.all'] = np.ones(nP,dtype=bool)
+        pn['pore.volume'] = Pores.loc[:, 'volume'].to_numpy()
+        pn['pore.radius'] = Pores.loc[:, 'radius'].to_numpy()
 
-        network['pore.shape_factor'] = Pores.loc[:, 'shape_factor'].to_numpy()
-        network['pore.clay_volume'] = Pores.loc[:, 'clay_volume'].to_numpy()
-        network['pore.coords'] = Pores.loc[:, ['x','y','z']].to_numpy()
-        network['throat._id'] = Throats.loc[:, 'index'].to_numpy()
-        network['throat.label'] = Throats.loc[:, 'index'].to_numpy()
-        network['throat.all'] = np.ones(nT,dtype=bool)
-        # network['throat.inlets']=inThroats
-        # network['throat.outlets']=outThroats
+        pn['pore.shape_factor'] = Pores.loc[:, 'shape_factor'].to_numpy()
+        pn['pore.clay_volume'] = Pores.loc[:, 'clay_volume'].to_numpy()
+        pn['pore.coords'] = Pores.loc[:, ['x','y','z']].to_numpy()
+        pn['throat._id'] = Throats.loc[:, 'index'].to_numpy()
+        pn['throat.label'] = Throats.loc[:, 'index'].to_numpy()
+        pn['throat.all'] = np.ones(nT,dtype=bool)
+        # pn['throat.inlets']=inThroats
+        # pn['throat.outlets']=outThroats
 
-        network['throat.inside'] = ~(inThroats | outThroats)
-        # network['throat.shape_factor'] = Throats1[:, 0]
-        # network['throat.shape_factor']=Throats.loc[:,'shape_factor'].to_numpy()
+        pn['throat.inside'] = ~(inThroats | outThroats)
+        # pn['throat.shape_factor'] = Throats1[:, 0]
+        # pn['throat.shape_factor']=Throats.loc[:,'shape_factor'].to_numpy()
         throat_conns = (Throats.loc[:, ['pore_1_index','pore_2_index']] - [1, 1]).to_numpy()
         throat_conns[throat_conns[:, 0] > throat_conns[:, 1]] = throat_conns[:, [1, 0]][throat_conns[:, 0] > throat_conns[:, 1]] # make throat_conns first < second
         throat_out_in = throat_conns[(throat_conns[:, 0] < 0)]
         index = np.digitize(throat_out_in[:, 1], oldPores) - 1
-        throat_out_in[:, 1] = network['pore._id'][index]
+        throat_out_in[:, 1] = pn['pore._id'][index]
         throat_internal = throat_conns[(throat_conns[:, 0] >= 0)]
         index = np.digitize(throat_internal[:, 0], oldPores) - 1
-        throat_internal[:, 0] = network['pore._id'][index]
+        throat_internal[:, 0] = pn['pore._id'][index]
         index = np.digitize(throat_internal[:, 1], oldPores) - 1
-        throat_internal[:, 1] = network['pore._id'][index]
-        network['throat.conns'] = np.concatenate((throat_out_in, throat_internal), axis=0).astype(np.int64)
+        throat_internal[:, 1] = pn['pore._id'][index]
+        pn['throat.conns'] = np.concatenate((throat_out_in, throat_internal), axis=0).astype(np.int64)
 
-        network['pore.inlets'] = ~np.copy(network['pore.all'])
-        network['pore.inlets'][
-            np.array(network['throat.conns'][network['throat.conns'][:, 0] == -2][:, 1]).astype(int)] = True
-        network['pore.outlets'] = ~np.copy(network['pore.all'])
-        network['pore.outlets'][
-            np.array(network['throat.conns'][network['throat.conns'][:, 0] == -1][:, 1]).astype(int)] = True
-        network['throat.radius'] = Throats.loc[:, 'radius'].to_numpy()
-        network['throat.shape_factor'] = Throats.loc[:, 'shape_factor'].to_numpy()
-        network['throat.length'] = Throats.loc[:, 'length'].to_numpy()
-        network['throat.total_length'] = Throats.loc[:, 'total_length'].to_numpy()
-        network['throat.conduit_lengths_pore1'] = Throats2.loc[:, 'conduit_lengths_pore1'].to_numpy()
-        network['throat.conduit_lengths_pore2'] = Throats2.loc[:, 'conduit_lengths_pore2'].to_numpy()
-        network['throat.conduit_lengths_throat'] = Throats2.loc[:, 'length'].to_numpy()
+        pn['pore.inlets'] = ~np.copy(pn['pore.all'])
+        pn['pore.inlets'][
+            np.array(pn['throat.conns'][pn['throat.conns'][:, 0] == -2][:, 1]).astype(int)] = True
+        pn['pore.outlets'] = ~np.copy(pn['pore.all'])
+        pn['pore.outlets'][
+            np.array(pn['throat.conns'][pn['throat.conns'][:, 0] == -1][:, 1]).astype(int)] = True
+        pn['throat.radius'] = Throats.loc[:, 'radius'].to_numpy()
+        pn['throat.shape_factor'] = Throats.loc[:, 'shape_factor'].to_numpy()
+        pn['throat.length'] = Throats.loc[:, 'length'].to_numpy()
+        pn['throat.total_length'] = Throats.loc[:, 'total_length'].to_numpy()
+        pn['throat.conduit_lengths_pore1'] = Throats2.loc[:, 'conduit_lengths_pore1'].to_numpy()
+        pn['throat.conduit_lengths_pore2'] = Throats2.loc[:, 'conduit_lengths_pore2'].to_numpy()
+        pn['throat.conduit_lengths_throat'] = Throats2.loc[:, 'length'].to_numpy()
 
         BndG1 = (np.sqrt(3) / 36 + 0.00001)
         BndG2 = 0.07
-        network['throat.real_shape_factor'] = network['throat.shape_factor']
-        network['throat.real_shape_factor'][
-            (network['throat.shape_factor'] > BndG1) & (network['throat.shape_factor'] <= BndG2)] = 1 / 16
-        network['throat.real_shape_factor'][(network['throat.shape_factor'] > BndG2)] = 1 / 4 / np.pi
-        network['pore.real_shape_factor'] = network['pore.shape_factor']
-        network['pore.real_shape_factor'][
-            (network['pore.shape_factor'] > BndG1) & (network['pore.shape_factor'] <= BndG2)] = 1 / 16
-        network['pore.real_shape_factor'][(network['pore.shape_factor'] > BndG2)] = 1 / 4 / np.pi
-        network['throat.real_k'] = network['throat.all'] * 0.6
-        network['throat.real_k'][
-            (network['throat.shape_factor'] > BndG1) & (network['throat.shape_factor'] <= BndG2)] = 0.5623
-        network['throat.real_k'][(network['throat.shape_factor'] > BndG2)] = 0.5
-        network['pore.real_k'] = network['pore.all'] * 0.6
-        network['pore.real_k'][
-            (network['pore.shape_factor'] > BndG1) & (network['pore.shape_factor'] <= BndG2)] = 0.5623
-        network['pore.real_k'][(network['pore.shape_factor'] > BndG2)] = 0.5
-        return network
+        pn['throat.real_shape_factor'] = pn['throat.shape_factor']
+        pn['throat.real_shape_factor'][
+            (pn['throat.shape_factor'] > BndG1) & (pn['throat.shape_factor'] <= BndG2)] = 1 / 16
+        pn['throat.real_shape_factor'][(pn['throat.shape_factor'] > BndG2)] = 1 / 4 / np.pi
+        pn['pore.real_shape_factor'] = pn['pore.shape_factor']
+        pn['pore.real_shape_factor'][
+            (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 1 / 16
+        pn['pore.real_shape_factor'][(pn['pore.shape_factor'] > BndG2)] = 1 / 4 / np.pi
+        pn['throat.real_k'] = pn['throat.all'] * 0.6
+        pn['throat.real_k'][
+            (pn['throat.shape_factor'] > BndG1) & (pn['throat.shape_factor'] <= BndG2)] = 0.5623
+        pn['throat.real_k'][(pn['throat.shape_factor'] > BndG2)] = 0.5
+        pn['pore.real_k'] = pn['pore.all'] * 0.6
+        pn['pore.real_k'][
+            (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 0.5623
+        pn['pore.real_k'][(pn['pore.shape_factor'] > BndG2)] = 0.5
+        return pn
 
-    def getting_zoom_value(self, network, side, imsize, resolution):
+    @staticmethod
+    def getting_zoom_value(pn, side, imsize, resolution):
         if side in ['left', 'right']:
             value = imsize[0] * imsize[1] * resolution ** 2 / np.sum(
-                network['pore.radius'][network['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
+                pn['pore.radius'][pn['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
         elif side in ['top', 'bottom']:
             value = imsize[1] * imsize[2] * resolution ** 2 / np.sum(
-                network['pore.radius'][network['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
+                pn['pore.radius'][pn['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
         elif side in ['front', 'back']:
             value = imsize[0] * imsize[2] * resolution ** 2 / np.sum(
-                network['pore.radius'][network['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
+                pn['pore.radius'][pn['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
         return value
 
-    def get_program_parameters(self, path):
+    @staticmethod
+    def get_program_parameters(path):
         import argparse
         description = 'Read a VTK XML PolyData file.'
         epilogue = ''''''
@@ -144,13 +147,14 @@ class network(Base):
         args = parser.parse_args()
         return args.filename
 
-    def vtp2network(self, path):
-        network = {}
-        filename = self.get_program_parameters(path)
+    @staticmethod
+    def vtp2network(path):
+        pn = {}
+        filename = network.get_program_parameters(path)
         reader = vtkXMLPolyDataReader()
         reader.SetFileName(filename)
         reader.Update()
-        network['pore._id'] = np.arange(reader.GetOutput().GetNumberOfPoints()).astype(np.int64)
+        pn['pore._id'] = np.arange(reader.GetOutput().GetNumberOfPoints()).astype(np.int64)
         point_data = reader.GetOutput().GetPointData()
         point_data_count = point_data.GetNumberOfArrays()
         point_data = {point_data.GetArrayName(i): numpy_support.vtk_to_numpy(point_data.GetArray(i)) for
@@ -164,12 +168,13 @@ class network(Base):
         all_data = {}
         all_data.update(point_data)
         all_data.update(cell_data)
-        network['pore.label'] = network['pore.label'].astype(np.int64) if 'pore.label' in network.keys() else np.arange(
-            len(network['pore._id']))
-        network['throat._id'] = network['throat._id'].astype(np.int64)
-        return network
+        pn['pore.label'] = pn['pore.label'].astype(np.int64) if 'pore.label' in pn.keys() else np.arange(
+            len(pn['pore._id']))
+        pn['throat._id'] = pn['throat._id'].astype(np.int64)
+        return pn
 
-    def array_to_element(self, name, array, n=1):
+    @staticmethod
+    def array_to_element(name, array, n=1):
         dtype_map = {
             "int8": "Int8",
             "int16": "Int16",
@@ -192,7 +197,8 @@ class network(Base):
             element.text = "\t".join(map(str, array.ravel()))
         return element
 
-    def network2vtk(self, network, filename="test.vtp",
+    @staticmethod
+    def network2vtk(pn, filename="test.vtp",
                     fill_nans=None, fill_infs=None):
         '''
         from openpnm
@@ -217,13 +223,13 @@ class network(Base):
         d = globals()
         network_name = ''
         for key in d:
-            if type(d[key]) is type(network) and d[key] == network:
+            if type(d[key]) is type(pn) and d[key] == pn:
                 network_name = key
 
-        key_list = list(network.keys())
+        key_list = list(pn.keys())
 
-        points = network["pore.coords"]
-        pairs = network["throat.conns"]
+        points = pn["pore.coords"]
+        pairs = pn["throat.conns"]
         num_points = np.shape(points)[0]
         num_throats = np.shape(pairs)[0]
 
@@ -232,18 +238,18 @@ class network(Base):
         piece_node.set("NumberOfPoints", str(num_points))
         piece_node.set("NumberOfLines", str(num_throats))
         points_node = piece_node.find("Points")
-        coords = self.array_to_element("coords", points.T.ravel("F"), n=3)
+        coords = network.array_to_element("coords", points.T.ravel("F"), n=3)
         points_node.append(coords)
         lines_node = piece_node.find("Lines")
-        connectivity = self.array_to_element("connectivity", pairs)
+        connectivity = network.array_to_element("connectivity", pairs)
         lines_node.append(connectivity)
-        offsets = self.array_to_element("offsets", 2 * np.arange(len(pairs)) + 2)
+        offsets = network.array_to_element("offsets", 2 * np.arange(len(pairs)) + 2)
         lines_node.append(offsets)
 
         point_data_node = piece_node.find("PointData")
         cell_data_node = piece_node.find("CellData")
         for key in key_list:
-            array = network[key]
+            array = pn[key]
             if array.dtype == "O":
                 logger.warning(key + " has dtype object," + " will not write to file")
             else:
@@ -265,7 +271,7 @@ class network(Base):
                     else:
                         array[np.isinf(array)] = fill_infs
                 # print(array)
-                element = self.array_to_element(key, array)
+                element = network.array_to_element(key, array)
                 if array.size == num_points:
                     point_data_node.append(element)
                 elif array.size == num_throats:

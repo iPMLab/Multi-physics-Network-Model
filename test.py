@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
+import numba as nb
 
-data=np.array([[1,2,3],
-              [4,5,6]])
-a=pd.DataFrame(columns=['a','b','c'],data=data)
-c=pd.concat((a,a),axis=1)
-print(c)
-z=c.loc[:,'a']
-print(z)
+@nb.njit(parallel=True, fastmath=True)
+def a_(a):
+    if a==1:
+        return 1
+    else:
+        return None
+
+print(a_(1))
