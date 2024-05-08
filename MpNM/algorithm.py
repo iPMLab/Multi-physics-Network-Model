@@ -6,7 +6,7 @@ Created on Fri Jun 17 18:48:35 2022
 @author: htmt
 """
 
-from scipy.sparse import coo_matrix
+from scipy.sparse import csr_matrix
 import scipy.sparse.linalg as ssl
 import pypardiso as pp
 import openpnm as op
@@ -20,8 +20,8 @@ class algorithm(Base):
     @staticmethod
     def stead_stay_alg_multi(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
         num_pore = len(pn.pores())
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                       shape=(num_pore, num_pore), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                       shape=(num_pore, num_pore), dtype=np.float64)
         A = (A.T + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
@@ -87,8 +87,8 @@ class algorithm(Base):
     @staticmethod
     def stead_stay_alg(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
         num_pore = len(pn['pore.all'])
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                       shape=(num_pore, num_pore), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                       shape=(num_pore, num_pore), dtype=np.float64)
         A = (A.T + A).tolil()
         dig = np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
@@ -150,8 +150,8 @@ class algorithm(Base):
     @staticmethod
     def correct_pressure(pn, coe_A, Boundary_condition, resolution, S_term=False):
         num_pore = len(pn['pore.all'])
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                       shape=(num_pore, num_pore), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                       shape=(num_pore, num_pore), dtype=np.float64)
         A = (A.T + A).tolil()
         dig = -np.array(A.sum(axis=0)).reshape(num_pore)
         b = np.zeros(num_pore)
@@ -170,15 +170,15 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = num_node // 25000
         Num = 2 if Num < 2 else Num
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
 
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -255,14 +255,14 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -362,15 +362,15 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = num_node // 25000
         Num = 2 if Num < 2 else Num
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
 
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -458,15 +458,15 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = min((num_node // 25000) + 1, 10)
         # Num=2 if Num <2 else Num
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
 
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -552,14 +552,14 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = (num_node // 25000) + 1
         # Num=2 if Num <2 else Num
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -572,7 +572,7 @@ class algorithm(Base):
 
         # boundary condition set shuold be discussed
         # t0 = time.time()
-        A_c = A  # copy A
+        A_c = A.copy()  # copy A
         # T_res=[]
         # Phase= op.phases.Water(pn=pn)
 
@@ -658,14 +658,14 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 
@@ -757,14 +757,14 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
         # RH= func_pv(1.0,302)/func_ps(302)
@@ -872,14 +872,14 @@ class algorithm(Base):
         num_node = len(pn['pore.all'])
         Num = max((num_node // 25000), 2)
 
-        B = coo_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
+        B = csr_matrix((coe_B, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
         A0 = (B.T + B).tolil()
         del B
-        A = coo_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
-                       shape=(num_node, num_node), dtype=np.float64).tocsr()
-        AH = coo_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
-                        shape=(num_node, num_node), dtype=np.float64).tocsr()
+        A = csr_matrix((coe_A, (pn['throat.conns'][:, 0], pn['throat.conns'][:, 1])),
+                       shape=(num_node, num_node), dtype=np.float64)
+        AH = csr_matrix((coe_A_i, (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
+                        shape=(num_node, num_node), dtype=np.float64)
         A1 = (AH + A).tolil()
         A = (A0 - A1).tolil()
 

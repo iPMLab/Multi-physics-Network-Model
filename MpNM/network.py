@@ -121,6 +121,10 @@ class network(Base):
         pn['pore.real_k'][
             (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 0.5623
         pn['pore.real_k'][(pn['pore.shape_factor'] > BndG2)] = 0.5
+        pn['throat.area'] = ((pn['throat.radius']**2)
+                              / (4.0*pn['throat.shape_factor']))
+        pn['pore.area'] = ((pn['pore.radius']**2)
+                            / (4.0*pn['pore.shape_factor']))
         return pn
 
     @staticmethod
@@ -134,6 +138,8 @@ class network(Base):
         elif side in ['front', 'back']:
             value = imsize[0] * imsize[2] * resolution ** 2 / np.sum(
                 pn['pore.radius'][pn['pore.boundary_' + side + '_surface']] ** 2 * np.pi)
+        else:
+            raise ValueError('Wrong side name')
         return value
 
     @staticmethod

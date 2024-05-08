@@ -61,10 +61,11 @@ def lambda_calc_nb(j, heat_coe, fluid_lambda, solid_lambda, network_throat_conns
 #     return [heat_s_f,heat_s_f_bronze,effect_lambda]
 
 
-path = './pore_network'
+sample_data_root='../../sample_data/Sphere_stacking_250_500_2800_20/'
+path = sample_data_root+'pore_network'
 # project = op.io.Statoil.load(path=path, prefix='sphere_stacking_250_500_2800_20')
 
-project = network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
+project = network().read_network(path=path, name='sphere_stacking_250_500_2800_20')
 pn_o = project
 # pn_o.name = 'pore'
 
@@ -77,18 +78,18 @@ pn_o = project
 # water = op.phases.Water(network=pn)
 imsize = np.array([2800, 500, 250])
 resolution = 21.4e-6
-connect_throat = pd.read_csv('./solid_network/dual_network_interface_sphere_stacking_500_500_2000_60.csv')
+connect_throat = pd.read_csv(sample_data_root+'solid_network/dual_network_interface_sphere_stacking_250_500_2800_20.csv')
 connect_throat = np.array(connect_throat)[:, 1:] - [1, 1, 0]
 connect_throat[:, 2] = (connect_throat[:, 2] / np.pi) ** 0.5 * resolution
 conn_t = np.array(connect_throat)
-data_volume = pd.read_csv('./solid_network/dual_network_volume_sphere_stacking_500_500_2000_60.csv')
+data_volume = pd.read_csv(sample_data_root+'solid_network/dual_network_volume_sphere_stacking_250_500_2800_20.csv')
 
 '''
 path='./pore_center_500_500_2500_20.csv'
 pore_im=pd.read_csv(path)
 pore_im=np.array(pore_im)
 '''
-path = './solid_network/solid_center_sphere_stacking_500_500_2000_60.csv'
+path = sample_data_root+'solid_network/solid_center_sphere_stacking_250_500_2800_20.csv'
 solid_im = pd.read_csv(path)
 solid_im = np.array(solid_im)
 
@@ -134,6 +135,7 @@ pn['pore.real_k'][(pn['pore.shape_factor'] > np.sqrt(3) / 36 + 1e-5) & (pn['pore
 pn['pore.real_k'][(pn['pore.shape_factor'] > 0.07)] = 0.5
 pn['throat.void'] = pn['throat.all']
 pn['pore.void'] = pn['pore.all']
+# pn['throat.area']=pn['throat.radius']**2*np.pi
 
 solid = {}
 solid['pore.all'] = solid_im[:, 1].astype(bool)
@@ -145,15 +147,20 @@ solid['throat.radius'] = (solid['throat.conns'][:, 2]).astype(np.float64)
 # solid['throat.radius']=((solid['throat.conns'][:,2]/np.pi)**0.5*resolution).astype(np.float64)
 solid['throat.conns'] = (solid['throat.conns'][:, :2]).astype(np.int64) - len(pn['pore._id'])
 solid['throat.all'] = np.ones(len(solid['throat.conns'])).astype(bool)
-print(np.unique(solid['throat.conns']))
+# print(np.unique(solid['throat.conns']))
 solid['throat.length'] = np.array(
     [np.linalg.norm((solid['pore.coords'][k[0]] - solid['pore.coords'][k[1]])) for k in solid['throat.conns']])
 solid['throat.void'] = np.ones(solid['throat.all'].size).astype(bool)
-sn = op.network.GenericNetwork(name='sn')
+
+# sn = op.network.GenericNetwork(name='sn')
+sn={}
 sn.update(solid)
 
-sn['pore._id'] = np.arange(len(sn['pore._id']))
-sn['throat._id'] = np.arange(len(sn['throat._id']))
+sn['pore._id']=np.arange(len(solid['pore.all']))
+sn['throat._id']=np.arange(len(sn['throat.all']))
+
+# sn['pore._id'] = np.arange(len(sn['pore._id']))
+# sn['throat._id'] = np.arange(len(sn['throat._id']))
 pn['pore._id'] = np.arange(len(pn['pore._id']))
 pn['throat._id'] = np.arange(len(pn['throat._id']))
 
@@ -297,8 +304,10 @@ backup_dualn = dict(dualn).copy()
 # T_res=transient_temperature(dualn, P_profile,fluid,solid,imsize,resolution,time_step,delta_t)
 it_num = []
 Perm = 1.012e-10
-for n in np.arange(6):
-    re = np.array([1249, 1650, 1918, 100, 300, 743])[n]
+re_s=np.array([1249, 1650, 1918, 100, 300, 743])
+for n in np.arange(len(re_s)):
+    re = re_s[n]
+    print(re)
     vel = re * fluid['viscosity'] / fluid['density'] / (
             2 * imsize[1] * imsize[2] / (imsize[1] + imsize[2])) / resolution
     u = np.around(vel, 6)  #
@@ -377,6 +386,7 @@ for n in np.arange(6):
         T_res = []
         tol = 1e-2
         while mean_squared_error(Tem_c, T_x0) ** 0.5 > tol:
+            print(1)
             if len(T_res) >= 20:
                 if mean_absolute_percentage_error(Tem_c, T_res[-3]) < tol / 10:
                     break
@@ -442,13 +452,14 @@ for n in np.arange(6):
 
             idx = 0
             while mean_squared_error(P_profile_back, P_profile_tem) ** 0.5 > 1e-1:
+                # print(mean_absolute_percentage_error(P_profile_back, P_profile_tem))
 
                 if idx > 30 and mean_absolute_percentage_error(P_profile_back, P_profile_tem) < 1e-3:
                     break
                 else:
                     idx += 1
 
-                coe_A_P = np.array(topotools().Mass_conductivity(pn)) / pn['throat.total_length']
+                coe_A_P = np.array(topotools.Mass_conductivity(pn)) / pn['throat.total_length']
                 Vel_Throat_profile = (np.abs(flux_Throat_profile / pn['throat.area']) * 0.5 + np.abs(
                     flux_Throat_profile / pn['throat.radius'] ** 2 / np.pi * 0.5))
                 RE_th = (Vel_Throat_profile * pn['throat.radius'] * 2 * fluid['density'] / pn[
