@@ -9,15 +9,12 @@ Created on Sun Dec 12 14:25:38 2021
 import sys
 
 sys.path.append('/media/htmt/Expansion/Multi-physics-Network-Model/')
-import MpNM.phase as phase
-import MpNM.topotools as topotools
-import MpNM.algorithm as algorithm
-import MpNM.network as network
-
+# import MpNM.phase as phase
+from MpNM import topotools,algorithm,network as net
 from scipy.sparse import coo_matrix
 import numpy as np
 import matplotlib.pyplot as plt
-import openpnm as op
+# import openpnm as op
 import time
 import copy
 import pandas as pd
@@ -66,7 +63,7 @@ sample_data_root='../../sample_data/Sphere_stacking_250_500_2800_20/'
 path = sample_data_root+'pore_network'
 # project = op.io.Statoil.load(path=path, prefix='sphere_stacking_250_500_2800_20')
 
-project = network().read_network(path=path, name='sphere_stacking_250_500_2800_20')
+project = net.read_network(path=path, name='sphere_stacking_250_500_2800_20')
 pn_o = project
 # pn_o.name = 'pore'
 
@@ -175,7 +172,8 @@ conn_t = conn_t[conn_t[:, 0] < len(pn['pore._id'])]
 conn_t_s = np.float64(conn_t[:, 2])
 conn_t = conn_t[:, 0:2].astype(np.int64)
 
-dualn = op.network.GenericNetwork(name='dual')
+dualn={}
+# dualn = op.network.GenericNetwork(name='dual')
 dualn['pore.all'] = np.ones(len(pn['pore.coords']) + len(sn['pore.coords']), dtype=bool)
 dualn['pore._id'] = np.arange(len(dualn['pore.all']))
 dualn['throat.all'] = np.ones(len(pn['throat.all']) + len(sn['throat.all']) + len(conn_t), dtype=bool)  ###
@@ -337,7 +335,8 @@ for n in np.arange(len(re_s)):
 
         boundary_surface['throat.boundary_connect'] = boundary_surface['throat.all']
         network = topotools().add_pores(dualn, boundary_surface, trail=False)
-        dualn = op.network.GenericNetwork(name='dual_' + side)
+        # dualn = op.network.GenericNetwork(name='dual_' + side)
+        dualn={}
         dualn.update(network)
         dualn['pore.solid'] = dualn['pore.solid'] | dualn['pore.boundary_' + side + '_surface']
         num_solid_ball = np.count_nonzero(dualn['pore.solid'])
@@ -564,7 +563,7 @@ for n in np.arange(len(re_s)):
 
             Tem_c = algorithm().stead_stay_alg_convection(dualn, coe_A, coe_A_i, coe_B, Boundary_condition_T, g_ij,
                                                           P_profile, fluid, solid, imsize, resolution, side)
-            Phase = op.phases.Water(network=dualn)
+            # Phase = op.phases.Water(network=dualn)
             Tem_c = (Tem_c + T_x0) / 2
             T_res.append(Tem_c)
             print('finish 1 cycle')
@@ -586,9 +585,13 @@ for n in np.arange(len(re_s)):
         print('number of iteration=', len(T_res))
         it_num.append(len(T_res))
         water['pore.velocity'] = Vel_Pore_profile
-        op.io.VTK.export_data(network=pn, phases=water, filename=path + '/pore_structure')
-        Phase = op.phases.Water(network=dualn)
-        op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
+        # op.io.VTK.export_data(network=pn, phases=water, filename=path + '/pore_structure')
+        net.network2vtk(pn=pn, filename=path + '/pore_structure')
+
+        # Phase = op.phases.Water(network=dualn)
+        # op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
+        net.network2vtk(pn=pn,filename=path + '/' + side + '_flow')
+
 
         layer_num = 14
         layer_way = 0  # 1,back front;0,left right;2,bottom top
@@ -665,16 +668,17 @@ for n in np.arange(len(re_s)):
         # local_wall_tem.to_csv(path+'/local_wall_tem_'+material+'_'+str(re)+side+'.csv')
         # model_res_pressure.append(np.average(P_profile[layer[1][i]&dualn['pore.void']]))
         tend = time.time()
-        Phase['pore.temperature'] = T_res[-1]
+        # Phase['pore.temperature'] = T_res[-1]
         num_node = len(dualn['pore.all'])
         B = coo_matrix(
             (coe_B / dualn['throat.radius'] ** 2 / np.pi, (dualn['throat.conns'][:, 0], dualn['throat.conns'][:, 1])),
             shape=(num_node, num_node), dtype=np.float64).tolil()
         A0 = (B.getH() + B).toarray()
         pore_h_coe = np.sum(A0, axis=0)
-        Phase['pore.h_coe'] = -pore_h_coe
+        # Phase['pore.h_coe'] = -pore_h_coe
 
-        op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
+        net.network2vtk(pn=dualn,filename=path + '/' + side + '_flow')
+        # op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
 
         output = topotools().calculate_heat_flow(dualn, Boundary_condition_T, g_ij, T_res[-1], thermal_con_dual,
                                                  P_profile, 4)

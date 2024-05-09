@@ -9,3 +9,7 @@ from MpNM.Base import Base
 from MpNM.network import network
 from MpNM.topotools import topotools
 from MpNM.phase import phase
+
+# algorithm=algorithm()
+# network=network()
+# topotools=topotools()

@@ -8,9 +8,7 @@ Created on Tue Apr 26 21:22:24 2022
 # from MpNM.network import network
 # from MpNM.topotools import topotools
 # from MpNM.algorithm import algorithm
-import MpNM.network as network
-import MpNM.topotools as topotools
-import MpNM.algorithm as algorithm
+from MpNM import network,topotools,algorithm
 import numpy as np
 import argparse
 import time
@@ -82,7 +80,7 @@ Boundary_condition_P = {}
 Boundary_condition_P['pore_inlet'] = {'pore.inlets': [1, 'Dirichlet']}
 Boundary_condition_P['pore_outlet'] = {'pore.outlets': [0, 'Dirichlet']}
 
-coe_A = np.array(topotools().Mass_conductivity(pn)) / pn['throat.total_length']
+coe_A = np.array(topotools.Mass_conductivity(pn)) / pn['throat.total_length']
 coe_A_P = coe_A
 Profile = algorithm.stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, resolution, bound_cond)
 delta_p = np.array([Profile[k[1]] - Profile[k[0]] for k in pn['throat.conns']])
