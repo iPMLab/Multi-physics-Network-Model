@@ -9,11 +9,12 @@ Created on Sun Dec 12 14:25:38 2021
 import sys
 
 sys.path.append('/media/htmt/Expansion/Multi-physics-Network-Model/')
-from MpNM.phase import phase
-from MpNM.topotools import topotools
-from MpNM.algorithm import algorithm
+import MpNM.phase as phase
+import MpNM.topotools as topotools
+import MpNM.algorithm as algorithm
+import MpNM.network as network
+
 from scipy.sparse import coo_matrix
-from MpNM.network import network
 import numpy as np
 import matplotlib.pyplot as plt
 import openpnm as op

@@ -294,5 +294,5 @@ class network(Base):
             f.write(string)
 
 if __name__=='__main__':
-    path='../Samples/heat_transfer/pore_network'
+    path= '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
     network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
