@@ -8,21 +8,16 @@ Created on Sun Dec 12 14:25:38 2021
 
 import sys
 
-sys.path.append('/media/htmt/Expansion/Multi-physics-Network-Model/')
-# import MpNM.phase as phase
-from MpNM import topotools,algorithm,network as net
+from MpNM import topotools, algorithm, network as net
 from scipy.sparse import coo_matrix
 import numpy as np
-import matplotlib.pyplot as plt
-# import openpnm as op
 import time
-import copy
 import pandas as pd
 import os
-from joblib import Parallel, delayed
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, r2_score
-from tqdm import tqdm
 import numba as nb
+
+nb.set_num_threads(10)
 
 
 def lambda_calc(network, j, heat_coe, fluid, solid):
@@ -59,35 +54,34 @@ def lambda_calc_nb(j, heat_coe, fluid_lambda, solid_lambda, network_throat_conns
 #     return [heat_s_f,heat_s_f_bronze,effect_lambda]
 
 
-sample_data_root='../../sample_data/Sphere_stacking_250_500_2800_20/'
-path = sample_data_root+'pore_network'
+sample_data_root = '../../sample_data/Sphere_stacking_250_500_2800_20/'
+path = sample_data_root + 'pore_network'
 # project = op.io.Statoil.load(path=path, prefix='sphere_stacking_250_500_2800_20')
 
 project = net.read_network(path=path, name='sphere_stacking_250_500_2800_20')
 pn_o = project
 # pn_o.name = 'pore'
-
 # pn['pore._id']=np.arange(len(pn['pore._id']))
 # pn['throat._id']=np.arange(len(pn['throat._id']))
 # pn['pore.coords']=pn['pore.coords'].astype(np.float32)
-
 # pn['throat.conns']=(pn['throat.conns']).astype(np.int32)
 
 # water = op.phases.Water(network=pn)
 imsize = np.array([2800, 500, 250])
 resolution = 21.4e-6
-connect_throat = pd.read_csv(sample_data_root+'solid_network/dual_network_interface_sphere_stacking_250_500_2800_20.csv')
+connect_throat = pd.read_csv(
+    sample_data_root + 'solid_network/dual_network_interface_sphere_stacking_250_500_2800_20.csv')
 connect_throat = np.array(connect_throat)[:, 1:] - [1, 1, 0]
 connect_throat[:, 2] = (connect_throat[:, 2] / np.pi) ** 0.5 * resolution
 conn_t = np.array(connect_throat)
-data_volume = pd.read_csv(sample_data_root+'solid_network/dual_network_volume_sphere_stacking_250_500_2800_20.csv')
+data_volume = pd.read_csv(sample_data_root + 'solid_network/dual_network_volume_sphere_stacking_250_500_2800_20.csv')
 
 '''
 path='./pore_center_500_500_2500_20.csv'
 pore_im=pd.read_csv(path)
 pore_im=np.array(pore_im)
 '''
-path = sample_data_root+'solid_network/solid_center_sphere_stacking_250_500_2800_20.csv'
+path = sample_data_root + 'solid_network/solid_center_sphere_stacking_250_500_2800_20.csv'
 solid_im = pd.read_csv(path)
 solid_im = np.array(solid_im)
 
@@ -151,11 +145,11 @@ solid['throat.length'] = np.array(
 solid['throat.void'] = np.ones(solid['throat.all'].size).astype(bool)
 
 # sn = op.network.GenericNetwork(name='sn')
-sn={}
+sn = {}
 sn.update(solid)
 
-sn['pore._id']=np.arange(len(solid['pore.all']))
-sn['throat._id']=np.arange(len(sn['throat.all']))
+sn['pore._id'] = np.arange(len(solid['pore.all']))
+sn['throat._id'] = np.arange(len(sn['throat.all']))
 
 # sn['pore._id'] = np.arange(len(sn['pore._id']))
 # sn['throat._id'] = np.arange(len(sn['throat._id']))
@@ -172,7 +166,7 @@ conn_t = conn_t[conn_t[:, 0] < len(pn['pore._id'])]
 conn_t_s = np.float64(conn_t[:, 2])
 conn_t = conn_t[:, 0:2].astype(np.int64)
 
-dualn={}
+dualn = {}
 # dualn = op.network.GenericNetwork(name='dual')
 dualn['pore.all'] = np.ones(len(pn['pore.coords']) + len(sn['pore.coords']), dtype=bool)
 dualn['pore._id'] = np.arange(len(dualn['pore.all']))
@@ -303,7 +297,7 @@ backup_dualn = dict(dualn).copy()
 # T_res=transient_temperature(dualn, P_profile,fluid,solid,imsize,resolution,time_step,delta_t)
 it_num = []
 Perm = 1.012e-10
-re_s=np.array([1249, 1650, 1918, 100, 300, 743])
+re_s = np.array([1249, 1650, 1918, 100, 300, 743])
 for n in np.arange(len(re_s)):
     re = re_s[n]
     print(re)
@@ -336,7 +330,7 @@ for n in np.arange(len(re_s)):
         boundary_surface['throat.boundary_connect'] = boundary_surface['throat.all']
         network = topotools().add_pores(dualn, boundary_surface, trail=False)
         # dualn = op.network.GenericNetwork(name='dual_' + side)
-        dualn={}
+        dualn = {}
         dualn.update(network)
         dualn['pore.solid'] = dualn['pore.solid'] | dualn['pore.boundary_' + side + '_surface']
         num_solid_ball = np.count_nonzero(dualn['pore.solid'])
@@ -386,7 +380,6 @@ for n in np.arange(len(re_s)):
         T_res = []
         tol = 1e-2
         while mean_squared_error(Tem_c, T_x0) ** 0.5 > tol:
-            print(1)
             if len(T_res) >= 20:
                 if mean_absolute_percentage_error(Tem_c, T_res[-3]) < tol / 10:
                     break
@@ -590,8 +583,7 @@ for n in np.arange(len(re_s)):
 
         # Phase = op.phases.Water(network=dualn)
         # op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
-        net.network2vtk(pn=pn,filename=path + '/' + side + '_flow')
-
+        net.network2vtk(pn=pn, filename=path + '/' + side + '_flow')
 
         layer_num = 14
         layer_way = 0  # 1,back front;0,left right;2,bottom top
@@ -677,7 +669,7 @@ for n in np.arange(len(re_s)):
         pore_h_coe = np.sum(A0, axis=0)
         # Phase['pore.h_coe'] = -pore_h_coe
 
-        net.network2vtk(pn=dualn,filename=path + '/' + side + '_flow')
+        net.network2vtk(pn=dualn, filename=path + '/' + side + '_flow')
         # op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
 
         output = topotools().calculate_heat_flow(dualn, Boundary_condition_T, g_ij, T_res[-1], thermal_con_dual,
@@ -734,6 +726,7 @@ for n in np.arange(len(re_s)):
         '''
 print(it_num)
 it_num = pd.DataFrame(it_num)
-it_num.to_csv('/media/htmt/Data/Bead_packing/sphere_stacking_2800/it_num_20220903.csv')
+# it_num.to_csv('/media/htmt/Data/Bead_packing/sphere_stacking_2800/it_num_20220903.csv')
+it_num.to_csv('./it_num_20220903.csv')
 tend = time.time()
 print('total time cost：%.6fs' % (tend - t0))

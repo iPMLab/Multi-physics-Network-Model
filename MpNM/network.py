@@ -15,7 +15,7 @@ import pandas as pd
 # from vtkmodules.util.numpy_support import numpy_to_vtk
 from xml.etree import ElementTree as ET
 import logging
-from joblib import Parallel, delayed
+# from joblib import Parallel, delayed
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +180,26 @@ class network(Base):
         return pn
 
     @staticmethod
+    def vtu2network():
+        import meshio
+        mesh = meshio.read(path)
+        # cell data
+        cell_keys = mesh.cell_data.keys()
+        cell_values = mesh.cell_data.values()
+        cell_data = dict(zip(cell_keys, [i[0] for i in cell_values]))
+
+        # point data
+        point_keys = mesh.point_data
+        point_values = mesh.point_data.values()
+        point_data = dict(zip(point_keys, [i[0] for i in point_values]))
+
+        all_data = {}
+        all_data.update(point_data)
+        all_data.update(cell_data)
+        return all_data
+
+
+    @staticmethod
     def array_to_element(name, array, n=1):
         dtype_map = {
             "int8": "Int8",
@@ -209,6 +229,8 @@ class network(Base):
         '''
         from openpnm
         '''
+        if filename.split('.')[-1]!='vtp':
+            filename+='.vtp'
         _TEMPLATE = """
         <?xml version="1.0" ?>
         <VTKFile byte_order="LittleEndian" type="PolyData" version="0.1">

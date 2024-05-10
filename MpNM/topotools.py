@@ -6,7 +6,7 @@ Created on Thu Apr 14 16:55:27 2022
 @author: htmt
 """
 import numpy as np
-import openpnm as op
+# import openpnm as op
 from MpNM.Base import *
 import copy
 from scipy.sparse import coo_matrix
@@ -185,54 +185,54 @@ class topotools(Base):
             pn[name_label1], pn[name_label2] = pn[name_label1].astype(bool), pn[name_label2].astype(
                 bool)
 
-    @staticmethod
-    def find_surface(pn, status, imsize, resolution, label_1='surface', label_2='surface', start=0.2,
-                     end=0.8):
-        if status == 'x':
-            size1 = int(imsize[1] / 100)
-            size2 = int(imsize[2] / 100)
-            # size=int(imsize[2]/100 )
-
-        elif status == 'y':
-            # size=int(imsize[1]/100)
-            size1 = int(imsize[0] / 100)
-            size2 = int(imsize[2] / 100)
-        elif status == 'z':
-            # size=int(imsize[1]/100)
-            size1 = int(imsize[0] / 100)
-            size2 = int(imsize[1] / 100)
-        marker = np.ones((size1, size2, 3))
-        for i in np.arange(size1):
-            for j in np.arange(size2):
-                a = np.linspace(start, end, size1)[i]
-                b = np.linspace(start, end, size2)[j]
-                marker[i, j, 0] = 1.1
-                marker[i, j, 1] = a
-                marker[i, j, 2] = b
-        if status == 'x':
-            marker_i = marker.reshape(size1 * size2, 3)
-            marker_j = np.copy(marker_i)
-            marker_j[:, 0] = -0.1
-            # markers_0=marker_j*imsize*resolution
-            # markers_1=marker_i*imsize*resolution
-        elif status == 'y':
-            marker_i = marker.reshape(size1 * size2, 3)
-            marker_i[:, [0, 1, 2]] = marker_i[:, [1, 0, 2]]
-            marker_j = np.copy(marker_i)
-            marker_j[:, 1] = -0.1
-            # markers_0=marker_j*imsize[[1,0,2]]*resolution
-            # markers_1=marker_i*imsize[[1,0,2]]*resolution
-        elif status == 'z':
-            marker_i = marker.reshape(size1 * size2, 3)
-            marker_i[:, [0, 1, 2]] = marker_i[:, [1, 2, 0]]
-            marker_j = np.copy(marker_i)
-            marker_j[:, 2] = -0.1
-        else:
-            raise Exception('error status should be x,y,z')
-        markers_0 = marker_j * imsize * resolution
-        markers_1 = marker_i * imsize * resolution
-        op.topotools.find_surface_pores(pn, markers_0, label=label_1)
-        op.topotools.find_surface_pores(pn, markers_1, label=label_2)
+    # @staticmethod
+    # def find_surface(pn, status, imsize, resolution, label_1='surface', label_2='surface', start=0.2,
+    #                  end=0.8):
+    #     if status == 'x':
+    #         size1 = int(imsize[1] / 100)
+    #         size2 = int(imsize[2] / 100)
+    #         # size=int(imsize[2]/100 )
+    #
+    #     elif status == 'y':
+    #         # size=int(imsize[1]/100)
+    #         size1 = int(imsize[0] / 100)
+    #         size2 = int(imsize[2] / 100)
+    #     elif status == 'z':
+    #         # size=int(imsize[1]/100)
+    #         size1 = int(imsize[0] / 100)
+    #         size2 = int(imsize[1] / 100)
+    #     marker = np.ones((size1, size2, 3))
+    #     for i in np.arange(size1):
+    #         for j in np.arange(size2):
+    #             a = np.linspace(start, end, size1)[i]
+    #             b = np.linspace(start, end, size2)[j]
+    #             marker[i, j, 0] = 1.1
+    #             marker[i, j, 1] = a
+    #             marker[i, j, 2] = b
+    #     if status == 'x':
+    #         marker_i = marker.reshape(size1 * size2, 3)
+    #         marker_j = np.copy(marker_i)
+    #         marker_j[:, 0] = -0.1
+    #         # markers_0=marker_j*imsize*resolution
+    #         # markers_1=marker_i*imsize*resolution
+    #     elif status == 'y':
+    #         marker_i = marker.reshape(size1 * size2, 3)
+    #         marker_i[:, [0, 1, 2]] = marker_i[:, [1, 0, 2]]
+    #         marker_j = np.copy(marker_i)
+    #         marker_j[:, 1] = -0.1
+    #         # markers_0=marker_j*imsize[[1,0,2]]*resolution
+    #         # markers_1=marker_i*imsize[[1,0,2]]*resolution
+    #     elif status == 'z':
+    #         marker_i = marker.reshape(size1 * size2, 3)
+    #         marker_i[:, [0, 1, 2]] = marker_i[:, [1, 2, 0]]
+    #         marker_j = np.copy(marker_i)
+    #         marker_j[:, 2] = -0.1
+    #     else:
+    #         raise Exception('error status should be x,y,z')
+    #     markers_0 = marker_j * imsize * resolution
+    #     markers_1 = marker_i * imsize * resolution
+    #     op.topotools.find_surface_pores(pn, markers_0, label=label_1)
+    #     op.topotools.find_surface_pores(pn, markers_1, label=label_2)
 
     @staticmethod
     def find_surface_s(pn, status='x', imsize=0, resolution=0, label_1='left', label_2='right'):

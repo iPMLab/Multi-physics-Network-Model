@@ -9,7 +9,7 @@ Created on Fri Jun 17 18:48:35 2022
 from scipy.sparse import csr_matrix
 import scipy.sparse.linalg as ssl
 import pypardiso as pp
-import openpnm as op
+# import openpnm as op
 from MpNM.Base import *
 from MpNM.topotools import topotools as tool
 from MpNM.network import network as net
@@ -449,7 +449,8 @@ class algorithm(Base):
             T_res.append(Tem_c)
             print(max(Tem_c), min(Tem_c))
             Phase['pore.temperature'] = Tem_c
-            op.io.VTK.export_data(pn=pn, phases=Phase, filename='./_{}'.format(i))
+            net.network2vtk(pn=pn,filename='./_{}'.format(i))
+            # op.io.VTK.export_data(pn=pn, phases=Phase, filename='./_{}'.format(i))
         return T_res
 
     @staticmethod

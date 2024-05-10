@@ -18,11 +18,12 @@ URL = 'https://github.com/me/myproject'
 EMAIL = 'me@example.com'
 AUTHOR = 'Awesome Soul'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.0.0'
+VERSION = '24.05.10'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
     # 'requests', 'maya', 'records',
+    'numpy','numba','pypardiso','scipy','meshio','vtk','pandas','scikit-learn'
 ]
 
 # What packages are optional?
