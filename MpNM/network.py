@@ -15,6 +15,7 @@ import pandas as pd
 # from vtkmodules.util.numpy_support import numpy_to_vtk
 from xml.etree import ElementTree as ET
 import logging
+
 # from joblib import Parallel, delayed
 
 logger = logging.getLogger(__name__)
@@ -32,13 +33,17 @@ class network(Base):
         Pores1 = np.loadtxt(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4))
         Pores2 = np.loadtxt(path + '/' + name + "_node2.dat")
         # convert numpy to pandas and conclude the throats and pores
-        Throats1=pd.DataFrame(data=Throats1,columns=['index','pore_1_index','pore_2_index','radius','shape_factor','total_length'])
-        Throats2=pd.DataFrame(data=Throats2,columns=['index','pore_1_index','pore_2_index','conduit_lengths_pore1','conduit_lengths_pore2','length','volume','clay_volume'])
-        Throats=pd.concat((Throats1,Throats2.loc[:,np.isin(Throats2.columns,Throats1.columns)==False]),axis=1)
+        Throats1 = pd.DataFrame(data=Throats1,
+                                columns=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
+                                         'total_length'])
+        Throats2 = pd.DataFrame(data=Throats2,
+                                columns=['index', 'pore_1_index', 'pore_2_index', 'conduit_lengths_pore1',
+                                         'conduit_lengths_pore2', 'length', 'volume', 'clay_volume'])
+        Throats = pd.concat((Throats1, Throats2.loc[:, np.isin(Throats2.columns, Throats1.columns) == False]), axis=1)
 
-        Pores1=pd.DataFrame(data=Pores1,columns=['index','x','y','z','connection_number'])
-        Pores2=pd.DataFrame(data=Pores2,columns=['index','volume','radius','shape_factor','clay_volume'])
-        Pores=pd.concat((Pores1,Pores2.loc[:,np.isin(Pores2.columns,Pores1.columns)==False]),axis=1)
+        Pores1 = pd.DataFrame(data=Pores1, columns=['index', 'x', 'y', 'z', 'connection_number'])
+        Pores2 = pd.DataFrame(data=Pores2, columns=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'])
+        Pores = pd.concat((Pores1, Pores2.loc[:, np.isin(Pores2.columns, Pores1.columns) == False]), axis=1)
         '''
         Throats1 = np.loadtxt("test1D_link1.dat", skiprows=1)
         Throats2 = np.loadtxt("test1D_link2.dat")
@@ -48,37 +53,38 @@ class network(Base):
 
         # Pores = Pores[Pores1[:, 4] >= 0, :]  #
         # Pores1 = Pores1[Pores1[:, 4] >= 0, :]  #
-        Pores=Pores[Pores.loc[:,'connection_number']>=0]
+        Pores = Pores[Pores.loc[:, 'connection_number'] >= 0]
         nonIsolatedPores = Pores.loc[:, 'index'].to_numpy()
-        newPores=np.arange(len(Pores.loc[:, 'index']))
+        newPores = np.arange(len(Pores.loc[:, 'index']))
         # inThroats = np.array(Throats1[:, 1] * Throats1[:, 2]) < 0
         # outThroats = np.abs(Throats1[:, 1] * Throats1[:, 2]) < 1
-        inThroats=(Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index']==-1).to_numpy()
-        outThroats=(Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index']==0).to_numpy()
+        inThroats = (Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index'] == -1).to_numpy()
+        outThroats = (Throats.loc[:, 'pore_1_index'] * Throats.loc[:, 'pore_2_index'] == 0).to_numpy()
         pn = {}
         nP = len(nonIsolatedPores)
         nT = len(Throats1)
         pn['pore._id'] = newPores
         pn['pore.label'] = newPores
         oldPores = nonIsolatedPores - 1
-        pn['pore.all'] = np.ones(nP,dtype=bool)
+        pn['pore.all'] = np.ones(nP, dtype=bool)
         pn['pore.volume'] = Pores.loc[:, 'volume'].to_numpy()
         pn['pore.radius'] = Pores.loc[:, 'radius'].to_numpy()
 
         pn['pore.shape_factor'] = Pores.loc[:, 'shape_factor'].to_numpy()
         pn['pore.clay_volume'] = Pores.loc[:, 'clay_volume'].to_numpy()
-        pn['pore.coords'] = Pores.loc[:, ['x','y','z']].to_numpy()
+        pn['pore.coords'] = Pores.loc[:, ['x', 'y', 'z']].to_numpy()
         pn['throat._id'] = Throats.loc[:, 'index'].to_numpy()
         pn['throat.label'] = Throats.loc[:, 'index'].to_numpy()
-        pn['throat.all'] = np.ones(nT,dtype=bool)
+        pn['throat.all'] = np.ones(nT, dtype=bool)
         # pn['throat.inlets']=inThroats
         # pn['throat.outlets']=outThroats
 
         pn['throat.inside'] = ~(inThroats | outThroats)
         # pn['throat.shape_factor'] = Throats1[:, 0]
         # pn['throat.shape_factor']=Throats.loc[:,'shape_factor'].to_numpy()
-        throat_conns = (Throats.loc[:, ['pore_1_index','pore_2_index']] - [1, 1]).to_numpy()
-        throat_conns[throat_conns[:, 0] > throat_conns[:, 1]] = throat_conns[:, [1, 0]][throat_conns[:, 0] > throat_conns[:, 1]] # make throat_conns first < second
+        throat_conns = (Throats.loc[:, ['pore_1_index', 'pore_2_index']] - [1, 1]).to_numpy()
+        throat_conns[throat_conns[:, 0] > throat_conns[:, 1]] = throat_conns[:, [1, 0]][
+            throat_conns[:, 0] > throat_conns[:, 1]]  # make throat_conns first < second
         throat_out_in = throat_conns[(throat_conns[:, 0] < 0)]
         index = np.digitize(throat_out_in[:, 1], oldPores) - 1
         throat_out_in[:, 1] = pn['pore._id'][index]
@@ -121,10 +127,10 @@ class network(Base):
         pn['pore.real_k'][
             (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 0.5623
         pn['pore.real_k'][(pn['pore.shape_factor'] > BndG2)] = 0.5
-        pn['throat.area'] = ((pn['throat.radius']**2)
-                              / (4.0*pn['throat.shape_factor']))
-        pn['pore.area'] = ((pn['pore.radius']**2)
-                            / (4.0*pn['pore.shape_factor']))
+        pn['throat.area'] = ((pn['throat.radius'] ** 2)
+                             / (4.0 * pn['throat.shape_factor']))
+        pn['pore.area'] = ((pn['pore.radius'] ** 2)
+                           / (4.0 * pn['pore.shape_factor']))
         return pn
 
     @staticmethod
@@ -154,50 +160,46 @@ class network(Base):
         return args.filename
 
     @staticmethod
-    def vtp2network(path):
-        pn = {}
-        filename = network.get_program_parameters(path)
-        reader = vtkXMLPolyDataReader()
-        reader.SetFileName(filename)
-        reader.Update()
-        pn['pore._id'] = np.arange(reader.GetOutput().GetNumberOfPoints()).astype(np.int64)
-        point_data = reader.GetOutput().GetPointData()
-        point_data_count = point_data.GetNumberOfArrays()
-        point_data = {point_data.GetArrayName(i): numpy_support.vtk_to_numpy(point_data.GetArray(i)) for
-                      i in range(point_data_count)}
+    def vtk2network(path):
+        vtk_type = path.split(".")[-1]
+        if vtk_type == "vtu":
+            import meshio
+            mesh = meshio.read(path)
+            # cell data
+            cell_keys = mesh.cell_data.keys()
+            cell_values = mesh.cell_data.values()
+            cell_data = dict(zip(cell_keys, [i[0] for i in cell_values]))
 
-        cell_data = reader.GetOutput().GetCellData()
-        cell_data_count = cell_data.GetNumberOfArrays()
-        cell_data = {cell_data.GetArrayName(i): numpy_support.vtk_to_numpy(cell_data.GetArray(i)) for i
-                     in range(cell_data_count)}
+            # point data
+            point_keys = mesh.point_data
+            point_values = mesh.point_data.values()
+            point_data = dict(zip(point_keys, [i[0] for i in point_values]))
 
-        all_data = {}
-        all_data.update(point_data)
-        all_data.update(cell_data)
-        pn['pore.label'] = pn['pore.label'].astype(np.int64) if 'pore.label' in pn.keys() else np.arange(
-            len(pn['pore._id']))
-        pn['throat._id'] = pn['throat._id'].astype(np.int64)
-        return pn
+            all_data = {}
+            all_data.update(point_data)
+            all_data.update(cell_data)
+            return all_data
 
-    @staticmethod
-    def vtu2network():
-        import meshio
-        mesh = meshio.read(path)
-        # cell data
-        cell_keys = mesh.cell_data.keys()
-        cell_values = mesh.cell_data.values()
-        cell_data = dict(zip(cell_keys, [i[0] for i in cell_values]))
+        elif vtk_type == "vtp":
+            import vtk
+            from vtkmodules.util import numpy_support
+            reader = vtk.vtkXMLPolyDataReader()
+            reader.SetFileName(path)
+            reader.Update()
+            point_data = reader.GetOutput().GetPointData()
+            point_data_count = point_data.GetNumberOfArrays()
+            point_data = {point_data.GetArrayName(i): numpy_support.vtk_to_numpy(point_data.GetArray(i)) for
+                          i in range(point_data_count)}
 
-        # point data
-        point_keys = mesh.point_data
-        point_values = mesh.point_data.values()
-        point_data = dict(zip(point_keys, [i[0] for i in point_values]))
+            cell_data = reader.GetOutput().GetCellData()
+            cell_data_count = cell_data.GetNumberOfArrays()
+            cell_data = {cell_data.GetArrayName(i): numpy_support.vtk_to_numpy(cell_data.GetArray(i)) for i
+                         in range(cell_data_count)}
 
-        all_data = {}
-        all_data.update(point_data)
-        all_data.update(cell_data)
-        return all_data
-
+            all_data = {}
+            all_data.update(point_data)
+            all_data.update(cell_data)
+            return all_data
 
     @staticmethod
     def array_to_element(name, array, n=1):
@@ -229,8 +231,8 @@ class network(Base):
         '''
         from openpnm
         '''
-        if filename.split('.')[-1]!='vtp':
-            filename+='.vtp'
+        if filename.split('.')[-1] != 'vtp':
+            filename += '.vtp'
         _TEMPLATE = """
         <?xml version="1.0" ?>
         <VTKFile byte_order="LittleEndian" type="PolyData" version="0.1">
@@ -279,9 +281,9 @@ class network(Base):
         for key in key_list:
             array = pn[key]
             if array.dtype == "O":
-                logger.warning(key + " has dtype object," + " will not write to file")
+                logger.warning(key + " has dtype object will not write to file")
             else:
-                if array.dtype == np.bool_:
+                if array.dtype == bool:
                     array = array.astype(int)
                     key = str(network_name) + ' network| label || ' + key
                 elif array.dtype == np.int32 or np.int64:
@@ -315,6 +317,7 @@ class network(Base):
             # consider adding header: '<?xml version="1.0"?>\n'+
             f.write(string)
 
-if __name__=='__main__':
-    path= '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
+
+if __name__ == '__main__':
+    path = '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
     network().read_network(path=path, name='sphere_stacking_500_500_2000_60')

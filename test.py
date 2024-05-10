@@ -3,5 +3,5 @@ import pandas as pd
 import numba as nb
 from scipy.sparse import csr_matrix
 
-a='123.vtp'
-print(a.split('.'))
+a=np.array([True,True])
+print(a.dtype==bool)
