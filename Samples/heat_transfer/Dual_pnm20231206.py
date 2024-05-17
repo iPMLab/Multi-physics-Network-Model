@@ -463,7 +463,7 @@ for n in np.arange(len(re_s)):
                 P_profile_tem = algorithm().stead_stay_alg(pn, fluid, coe_A_P, Boundary_condition_P, resolution, False)
                 P_profile_tem = (P_profile_tem + P_profile_back) / 2
                 delta_p = P_profile_tem[pn['throat.conns'][:, 1]] - P_profile_tem[pn['throat.conns'][:, 0]]
-                flux_Throat_profile = delta_p * coe_A_P
+                flux_Throat_profile = delta_p * coe_A_P+1.0e-12
 
             P_profile_tem = algorithm().stead_stay_alg(pn, fluid, coe_A_P, Boundary_condition_P, resolution, False)
             P_profile[dualn['pore.void']] = P_profile_tem
@@ -489,7 +489,7 @@ for n in np.arange(len(re_s)):
 
             # ---------------'''temperature process '''---------------#
 
-            flux_Throat_profile = delta_p * coe_A_P
+            flux_Throat_profile = delta_p * coe_A_P+1.0e-12
             Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 / 4 / pn['throat.real_shape_factor']
             RE_th = Vel_Throat_profile * pn['throat.radius'] * 2 * fluid['density'] / pn['throat.viscosity']
             # flux_Pore_profile=[cal_pore_veloc(pn,fluid,coe_A,P_profile,a) for a in pn['pore._id']]
