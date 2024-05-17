@@ -5,6 +5,10 @@ MpNM is a network model framework for simulating multi-physics processes (e.g. f
 ```
 pip install mpnm
 ```
+# How to use?
+```
+from MpNM import network,topotools,algorithm
+```
 ## Example 1 Absolute permeability (Being upload)
 
 Folder ```sample_data/Bead_packing``` is the example computing absolute permeability. There are four required input network files (*_link1.dat, *_link2.dat, *_node1.dat, *_node2.dat). These files can be generated using pnextract (https://github.com/ImperialCollegeLondon/pnextract).
