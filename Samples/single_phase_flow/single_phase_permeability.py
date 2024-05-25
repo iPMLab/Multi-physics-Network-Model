@@ -87,7 +87,7 @@ throat_conns=pn['throat.conns']
 delta_p=Profile[throat_conns[:,1]]-Profile[throat_conns[:,0]]
 flux_Throat_profile = delta_p * coe_A
 Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 * 4 * pn['throat.real_shape_factor']
-output = topotools().calculate_mass_flow(pn, Boundary_condition_P, coe_A_P, Profile, 8)
+output = topotools.calculate_mass_flow(pn, Boundary_condition_P, coe_A_P, Profile, 8)
 abs_perm = output['pore.inlets'] / (
         Boundary_condition_P['pore_inlet']['pore.inlets'][0] - Boundary_condition_P['pore_outlet']['pore.outlets'][
     0])
