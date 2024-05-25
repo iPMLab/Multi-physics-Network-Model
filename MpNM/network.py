@@ -125,6 +125,7 @@ class network(Base):
                              / (4.0 * pn['throat.shape_factor']))
         pn['pore.area'] = ((pn['pore.radius'] ** 2)
                            / (4.0 * pn['pore.shape_factor']))
+        pn['pore.solid']=np.zeros(nP,dtype=bool)
         return pn
 
     @staticmethod
