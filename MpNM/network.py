@@ -27,22 +27,16 @@ class network(Base):
 
     @staticmethod
     def read_network(path=None, name=None):
-        # load original numpy data
-        Throats1 = np.loadtxt(path + '/' + name + "_link1.dat", skiprows=1)
-        Throats2 = np.loadtxt(path + '/' + name + "_link2.dat")
-        Pores1 = np.loadtxt(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4))
-        Pores2 = np.loadtxt(path + '/' + name + "_node2.dat")
-        # convert numpy to pandas and conclude the throats and pores
-        Throats1 = pd.DataFrame(data=Throats1,
-                                columns=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
-                                         'total_length'])
-        Throats2 = pd.DataFrame(data=Throats2,
-                                columns=['index', 'pore_1_index', 'pore_2_index', 'conduit_lengths_pore1',
-                                         'conduit_lengths_pore2', 'length', 'volume', 'clay_volume'])
-        Throats = pd.concat((Throats1, Throats2.loc[:, np.isin(Throats2.columns, Throats1.columns) == False]), axis=1)
+        # conclude the throats and pores
+        Throats1=pd.read_csv(path + '/' + name + "_link1.dat", skiprows=1,names=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
+                                         'total_length'],delim_whitespace=True)
+        Throats2=pd.read_csv(path + '/' + name + "_link2.dat", names=['index', 'pore_1_index', 'pore_2_index', 'conduit_lengths_pore1',
+                                         'conduit_lengths_pore2', 'length', 'volume', 'clay_volume'],delim_whitespace=True)
 
-        Pores1 = pd.DataFrame(data=Pores1, columns=['index', 'x', 'y', 'z', 'connection_number'])
-        Pores2 = pd.DataFrame(data=Pores2, columns=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'])
+        Throats = pd.concat((Throats1, Throats2.loc[:, np.isin(Throats2.columns, Throats1.columns) == False]), axis=1)
+        Pores1=pd.read_csv(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4),delim_whitespace=True,names=['index', 'x', 'y', 'z', 'connection_number'])
+        Pores2=pd.read_csv(path + '/' + name + "_node2.dat",names=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'],delim_whitespace=True)
+        # Pores2 = pd.DataFrame(data=Pores2, columns=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'])
         Pores = pd.concat((Pores1, Pores2.loc[:, np.isin(Pores2.columns, Pores1.columns) == False]), axis=1)
         '''
         Throats1 = np.loadtxt("test1D_link1.dat", skiprows=1)
