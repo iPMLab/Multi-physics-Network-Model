@@ -5,13 +5,16 @@ Created on Tue Apr 26 21:22:24 2022
 
 @author: htmt
 """
+import MpNM
 # from MpNM.network import network
 # from MpNM.topotools import topotools
 # from MpNM.algorithm import algorithm
 from MpNM import network,topotools,algorithm
+import MpNM
 import numpy as np
 import argparse
 import time
+
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--Networkfile', default='../../sample_data/Bead_packing', help='input network path')

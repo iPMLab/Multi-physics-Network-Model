@@ -10,9 +10,9 @@ from scipy.sparse import csr_matrix
 import scipy.sparse.linalg as ssl
 import pypardiso as pp
 # import openpnm as op
-from MpNM.Base import *
-from MpNM.topotools import topotools as tool
-from MpNM.network import network as net
+from MpNM._Base import *
+from MpNM._topotools import topotools as tool
+from MpNM._network import network as net
 
 
 class algorithm(Base):

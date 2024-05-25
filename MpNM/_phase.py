@@ -5,7 +5,7 @@ Created on Thu Apr 14 17:02:52 2022
 
 @author: htmt
 """
-from MpNM.Base import *
+from MpNM._Base import *
 import numpy as np
 
 class phase(Base):

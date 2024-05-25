@@ -7,7 +7,7 @@ Created on Thu Apr 14 16:55:27 2022
 """
 import numpy as np
 # import openpnm as op
-from MpNM.Base import *
+from MpNM._Base import *
 import copy
 from scipy.sparse import coo_matrix
 from MpNM.tools_numba import *
