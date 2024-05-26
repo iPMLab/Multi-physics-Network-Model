@@ -29,13 +29,13 @@ class network(Base):
     def read_network(path=None, name=None):
         # conclude the throats and pores
         Throats1=pd.read_csv(path + '/' + name + "_link1.dat", skiprows=1,names=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
-                                         'total_length'],delim_whitespace=True)
+                                         'total_length'],sep='\s+')
         Throats2=pd.read_csv(path + '/' + name + "_link2.dat", names=['index', 'pore_1_index', 'pore_2_index', 'conduit_lengths_pore1',
-                                         'conduit_lengths_pore2', 'length', 'volume', 'clay_volume'],delim_whitespace=True)
+                                         'conduit_lengths_pore2', 'length', 'volume', 'clay_volume'],sep='\s+')
 
         Throats = pd.concat((Throats1, Throats2.loc[:, np.isin(Throats2.columns, Throats1.columns) == False]), axis=1)
-        Pores1=pd.read_csv(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4),delim_whitespace=True,names=['index', 'x', 'y', 'z', 'connection_number'])
-        Pores2=pd.read_csv(path + '/' + name + "_node2.dat",names=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'],delim_whitespace=True)
+        Pores1=pd.read_csv(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4),sep='\s+',names=['index', 'x', 'y', 'z', 'connection_number'])
+        Pores2=pd.read_csv(path + '/' + name + "_node2.dat",names=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'],sep='\s+')
         # Pores2 = pd.DataFrame(data=Pores2, columns=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'])
         Pores = pd.concat((Pores1, Pores2.loc[:, np.isin(Pores2.columns, Pores1.columns) == False]), axis=1)
         '''
