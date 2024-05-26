@@ -5,7 +5,7 @@ Created on Thu Apr 14 17:00:02 2022
 
 @author: htmt
 """
-from MpNM._Base import *
+from mpnm._Base import *
 import numpy as np
 from vtkmodules.vtkIOXML import vtkXMLPolyDataReader
 from vtkmodules.util import numpy_support

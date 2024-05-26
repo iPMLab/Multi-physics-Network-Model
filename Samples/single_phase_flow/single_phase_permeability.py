@@ -5,12 +5,12 @@ Created on Tue Apr 26 21:22:24 2022
 
 @author: htmt
 """
-import MpNM
-# from MpNM.network import network
-# from MpNM.topotools import topotools
-# from MpNM.algorithm import algorithm
-from MpNM import network,topotools,algorithm
-import MpNM
+import mpnm
+# from mpnm.network import network
+# from mpnm.topotools import topotools
+# from mpnm.algorithm import algorithm
+from mpnm import network,topotools,algorithm
+import mpnm
 import numpy as np
 import argparse
 import time
