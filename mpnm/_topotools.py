@@ -475,20 +475,21 @@ class topotools(Base):
         return layer
 
     @staticmethod
-    def pore_health(pn,equal=False):
+    def pore_health(pn,connections=1,equal=False):
         pores_in_conns, counts = np.unique(pn['throat.conns'], return_counts=True)
         if equal:
-            pores_in_conns = pores_in_conns[counts >= 1]
+            pores_in_conns = pores_in_conns[counts >= connections]
         else:
-            pores_in_conns = pores_in_conns[counts > 1]
+            pores_in_conns = pores_in_conns[counts > connections]
         pores = np.arange(len(pn['pore.all']))
         single_pores = np.setdiff1d(pores, pores_in_conns, assume_unique=True)
 
         health = {}
         health['single_pore'] = single_pores
-        health['single_throat'] = []
+        health['single_throat'] = np.where(np.isin(pn['throat.conns'], single_pores))[0]
 
         return health
+
 
     @staticmethod
     def pore_health_s(pn):
