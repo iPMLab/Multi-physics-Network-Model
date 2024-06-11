@@ -26,14 +26,15 @@ opt = parser.parse_args()
 t0 = time.time()
 path = opt.Networkfile
 name = opt.Networkname
-pn_o = network.read_network(path=path, name=name)
+pn_o = network.read_network(path=path, name=name,calculate_shape_factor=True,remove_in_out_throats=False)
 
 health = topotools.pore_health(pn_o,equal=True)
-back = topotools.trim_pore(pn_o, health['single_pore'], health['single_throat'])
+# print(health)
+pn_o = topotools.trim_pore(pn_o, health['single_pore'], health['single_throat'])
 # pn=op.network.GenericNetwork(name='pn')
 # pn.update(back)
 pn = {}
-pn.update(back)
+pn.update(pn_o)
 
 imsize = np.array(opt.imsize)
 resolution = opt.resolution

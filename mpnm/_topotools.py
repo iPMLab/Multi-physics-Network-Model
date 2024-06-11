@@ -526,27 +526,30 @@ class topotools(Base):
             if 'throat' in i:
                 backup[i] = np.delete(backup[i], throats, axis=0)
 
-        backup['pore._id'] = np.arange(len(backup['pore.all']))
-
         isothroat = np.where(np.any(np.isin(backup['throat.conns'], pores), axis=1))[0]
         for i in pn:
             if 'throat' in i:
                 backup[i] = np.delete(backup[i], isothroat, axis=0)
+
+        backup['pore._id'] = np.arange(len(backup['pore.all']))
         backup['throat._id'] = np.arange(len(backup['throat.all']))
-
-
-        throat_out_in = backup['throat.conns'][(backup['throat.conns'][:, 0] < 0)]
         index_th = backup['throat._id'][(backup['throat.conns'][:, 0] >= 0)]
-        index = np.digitize(throat_out_in[:, 1], backup['pore.label']) - 1
-        throat_out_in[:, 1] = backup['pore._id'][index]
         throat_internal = backup['throat.conns'][(backup['throat.conns'][:, 0] >= 0)]
         index = np.digitize(throat_internal[:, 0], backup['pore.label']) - 1
-
-        throat_internal[:, 0] = backup['pore._id'][index]
+        # throat_internal[:, 0] = backup['pore._id'][index]
+        throat_internal[:, 0]=index
+        # throat_internal[:, 0] = np.argsort(throat_internal[:, 0])
         index = np.digitize(throat_internal[:, 1], backup['pore.label']) - 1
-        throat_internal[:, 1] = backup['pore._id'][index]
-        backup['throat.conns'] = np.concatenate((throat_out_in, throat_internal),
-                                                axis=0) if bound_cond else throat_internal
+        # throat_internal[:, 1] = backup['pore._id'][index]
+        throat_internal[:, 1] = index
+        if bound_cond:
+            throat_out_in = backup['throat.conns'][(backup['throat.conns'][:, 0] < 0)]
+            index = np.digitize(throat_out_in[:, 1], backup['pore.label']) - 1
+            throat_out_in[:, 1] = backup['pore._id'][index]
+
+            backup['throat.conns'] = np.concatenate((throat_out_in, throat_internal), axis=0)
+        else:
+            backup['throat.conns'] = throat_internal
         for i in pn:
             if 'throat' in i and 'conns' not in i:
                 backup[i] = backup[i][index_th]
@@ -555,7 +558,6 @@ class topotools(Base):
         backup['pore.label'] = np.arange(len(backup['pore.all']))
         backup['throat.label'] = np.arange(len(backup['throat.all']))
         return backup
-
 
     @staticmethod
     def trim_phase(pn, pores, throat):

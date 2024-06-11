@@ -27,7 +27,7 @@ class network(Base):
         pass
 
     @staticmethod
-    def read_network(path=None, name=None,prefix=None,calculate_shape_factor=False,remove_in_out_throats=False):
+    def read_network(path=None, name=None,prefix=None,calculate_shape_factor=False,remove_in_out_throats=True):
         name = name if name !=None else prefix
         # conclude the throats and pores
         Throats1=pd.read_csv(path + '/' + name + "_link1.dat", skiprows=1,names=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
