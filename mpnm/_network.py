@@ -15,6 +15,7 @@ import pandas as pd
 # from vtkmodules.util.numpy_support import numpy_to_vtk
 from xml.etree import ElementTree as ET
 import logging
+from mpnm._topotools import topotools as tools
 
 # from joblib import Parallel, delayed
 
@@ -26,7 +27,8 @@ class network(Base):
         pass
 
     @staticmethod
-    def read_network(path=None, name=None):
+    def read_network(path=None, name=None,prefix=None,calculate_shape_factor=False,remove_in_out_throats=False):
+        name = name if name !=None else prefix
         # conclude the throats and pores
         Throats1=pd.read_csv(path + '/' + name + "_link1.dat", skiprows=1,names=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
                                          'total_length'],sep='\s+')
@@ -36,7 +38,6 @@ class network(Base):
         Throats = pd.concat((Throats1, Throats2.loc[:, np.isin(Throats2.columns, Throats1.columns) == False]), axis=1)
         Pores1=pd.read_csv(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4),sep='\s+',names=['index', 'x', 'y', 'z', 'connection_number'])
         Pores2=pd.read_csv(path + '/' + name + "_node2.dat",names=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'],sep='\s+')
-        # Pores2 = pd.DataFrame(data=Pores2, columns=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'])
         Pores = pd.concat((Pores1, Pores2.loc[:, np.isin(Pores2.columns, Pores1.columns) == False]), axis=1)
         '''
         Throats1 = np.loadtxt("test1D_link1.dat", skiprows=1)
@@ -77,24 +78,18 @@ class network(Base):
         # pn['throat.shape_factor'] = Throats1[:, 0]
         # pn['throat.shape_factor']=Throats.loc[:,'shape_factor'].to_numpy()
         throat_conns = (Throats.loc[:, ['pore_1_index', 'pore_2_index']] - [1, 1]).to_numpy()
+
         throat_conns[throat_conns[:, 0] > throat_conns[:, 1]] = throat_conns[:, [1, 0]][
             throat_conns[:, 0] > throat_conns[:, 1]]  # make throat_conns first < second
-        throat_out_in = throat_conns[(throat_conns[:, 0] < 0)]
-        index = np.digitize(throat_out_in[:, 1], oldPores) - 1
-        throat_out_in[:, 1] = pn['pore._id'][index]
-        throat_internal = throat_conns[(throat_conns[:, 0] >= 0)]
-        index = np.digitize(throat_internal[:, 0], oldPores) - 1
-        throat_internal[:, 0] = pn['pore._id'][index]
-        index = np.digitize(throat_internal[:, 1], oldPores) - 1
-        throat_internal[:, 1] = pn['pore._id'][index]
-        pn['throat.conns'] = np.concatenate((throat_out_in, throat_internal), axis=0).astype(np.int64)
 
+        pn['throat.conns']=throat_conns
         pn['pore.inlets'] = ~np.copy(pn['pore.all'])
-        pn['pore.inlets'][
-            np.array(pn['throat.conns'][pn['throat.conns'][:, 0] == -2][:, 1]).astype(int)] = True
-        pn['pore.outlets'] = ~np.copy(pn['pore.all'])
-        pn['pore.outlets'][
-            np.array(pn['throat.conns'][pn['throat.conns'][:, 0] == -1][:, 1]).astype(int)] = True
+        inlets_index=np.where(np.any(pn['throat.conns'] == -2,axis=1))[0]
+        pn['pore.inlets']=np.zeros_like(pn['pore.all'],dtype=bool)
+        pn['pore.inlets'][pn['throat.conns'][inlets_index, 1]]=True
+        outlets_index = np.where(np.any(pn['throat.conns'] == -1,axis=1))[0]
+        pn['pore.outlets']=np.zeros_like(pn['pore.all'],dtype=bool)
+        pn['pore.outlets'][pn['throat.conns'][outlets_index, 1]] = True
         pn['throat.radius'] = Throats.loc[:, 'radius'].to_numpy()
         pn['throat.shape_factor'] = Throats.loc[:, 'shape_factor'].to_numpy()
         pn['throat.length'] = Throats.loc[:, 'length'].to_numpy()
@@ -103,29 +98,33 @@ class network(Base):
         pn['throat.conduit_lengths_pore2'] = Throats2.loc[:, 'conduit_lengths_pore2'].to_numpy()
         pn['throat.conduit_lengths_throat'] = Throats2.loc[:, 'length'].to_numpy()
 
-        BndG1 = (np.sqrt(3) / 36 + 0.00001)
-        BndG2 = 0.07
-        pn['throat.real_shape_factor'] = pn['throat.shape_factor']
-        pn['throat.real_shape_factor'][
-            (pn['throat.shape_factor'] > BndG1) & (pn['throat.shape_factor'] <= BndG2)] = 1 / 16
-        pn['throat.real_shape_factor'][(pn['throat.shape_factor'] > BndG2)] = 1 / 4 / np.pi
-        pn['pore.real_shape_factor'] = pn['pore.shape_factor']
-        pn['pore.real_shape_factor'][
-            (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 1 / 16
-        pn['pore.real_shape_factor'][(pn['pore.shape_factor'] > BndG2)] = 1 / 4 / np.pi
-        pn['throat.real_k'] = pn['throat.all'] * 0.6
-        pn['throat.real_k'][
-            (pn['throat.shape_factor'] > BndG1) & (pn['throat.shape_factor'] <= BndG2)] = 0.5623
-        pn['throat.real_k'][(pn['throat.shape_factor'] > BndG2)] = 0.5
-        pn['pore.real_k'] = pn['pore.all'] * 0.6
-        pn['pore.real_k'][
-            (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 0.5623
-        pn['pore.real_k'][(pn['pore.shape_factor'] > BndG2)] = 0.5
+        if calculate_shape_factor:
+            BndG1 = (np.sqrt(3) / 36 + 0.00001)
+            BndG2 = 0.07
+            pn['throat.real_shape_factor'] = pn['throat.shape_factor']
+            pn['throat.real_shape_factor'][
+                (pn['throat.shape_factor'] > BndG1) & (pn['throat.shape_factor'] <= BndG2)] = 1 / 16
+            pn['throat.real_shape_factor'][(pn['throat.shape_factor'] > BndG2)] = 1 / 4 / np.pi
+            pn['pore.real_shape_factor'] = pn['pore.shape_factor']
+            pn['pore.real_shape_factor'][
+                (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 1 / 16
+            pn['pore.real_shape_factor'][(pn['pore.shape_factor'] > BndG2)] = 1 / 4 / np.pi
+            pn['throat.real_k'] = pn['throat.all'] * 0.6
+            pn['throat.real_k'][
+                (pn['throat.shape_factor'] > BndG1) & (pn['throat.shape_factor'] <= BndG2)] = 0.5623
+            pn['throat.real_k'][(pn['throat.shape_factor'] > BndG2)] = 0.5
+            pn['pore.real_k'] = pn['pore.all'] * 0.6
+            pn['pore.real_k'][
+                (pn['pore.shape_factor'] > BndG1) & (pn['pore.shape_factor'] <= BndG2)] = 0.5623
+            pn['pore.real_k'][(pn['pore.shape_factor'] > BndG2)] = 0.5
         pn['throat.area'] = ((pn['throat.radius'] ** 2)
                              / (4.0 * pn['throat.shape_factor']))
         pn['pore.area'] = ((pn['pore.radius'] ** 2)
                            / (4.0 * pn['pore.shape_factor']))
         pn['pore.solid']=np.zeros(nP,dtype=bool)
+        throats_trim=np.concatenate((inlets_index,outlets_index),axis=0)
+        if remove_in_out_throats:
+            pn=tools.trim_pore(pn,throats=throats_trim)
         return pn
 
     @staticmethod

@@ -475,7 +475,7 @@ class topotools(Base):
         return layer
 
     @staticmethod
-    def pore_health(pn,connections=1,equal=False):
+    def pore_health(pn, connections=1, equal=False):
         pores_in_conns, counts = np.unique(pn['throat.conns'], return_counts=True)
         if equal:
             pores_in_conns = pores_in_conns[counts >= connections]
@@ -489,7 +489,6 @@ class topotools(Base):
         health['single_throat'] = np.where(np.isin(pn['throat.conns'], single_pores))[0]
 
         return health
-
 
     @staticmethod
     def pore_health_s(pn):
@@ -514,15 +513,18 @@ class topotools(Base):
         return health
 
     @staticmethod
-    def trim_pore(pn, pores, throat, bound_cond=False):
-        # count=len(pn)
+    def trim_pore(pn, pores=None, throats=None, bound_cond=False):
+        if pores is None:
+            pores = []
+        if throats is None:
+            throats = []
         backup = {}
+        backup.update(pn)
         for i in pn:
             if 'pore' in i and 'throat' not in i:
-
-                backup[i] = np.delete(pn[i], pores, axis=0)
-            elif 'throat' in i:
-                backup[i] = np.delete(pn[i], throat, axis=0)
+                backup[i] = np.delete(backup[i], pores, axis=0)
+            if 'throat' in i:
+                backup[i] = np.delete(backup[i], throats, axis=0)
 
         backup['pore._id'] = np.arange(len(backup['pore.all']))
 
@@ -531,6 +533,8 @@ class topotools(Base):
             if 'throat' in i:
                 backup[i] = np.delete(backup[i], isothroat, axis=0)
         backup['throat._id'] = np.arange(len(backup['throat.all']))
+
+
         throat_out_in = backup['throat.conns'][(backup['throat.conns'][:, 0] < 0)]
         index_th = backup['throat._id'][(backup['throat.conns'][:, 0] >= 0)]
         index = np.digitize(throat_out_in[:, 1], backup['pore.label']) - 1
@@ -546,21 +550,12 @@ class topotools(Base):
         for i in pn:
             if 'throat' in i and 'conns' not in i:
                 backup[i] = backup[i][index_th]
-        '''
-        for j in np.arange(len(backup['throat.conns'])):
-            i=backup['throat.conns'][j]
-            if np.argwhere(backup['pore.label']==i[0]).size>0 and np.argwhere(backup['pore.label']==i[1]).size>0:
-                ind0=np.argwhere(backup['pore.label']==i[0])[0][0]
-                ind1=np.argwhere(backup['pore.label']==i[1])[0][0]
-                conns.append([ind0,ind1])
-            else:
-                isothroat.append(j)
-        '''
 
         backup['throat._id'] = np.arange(len(backup['throat.all']))
         backup['pore.label'] = np.arange(len(backup['pore.all']))
         backup['throat.label'] = np.arange(len(backup['throat.all']))
         return backup
+
 
     @staticmethod
     def trim_phase(pn, pores, throat):
@@ -690,7 +685,6 @@ class topotools(Base):
             lt = pn['throat.conduit_lengths.throat']
         g_ij = (li + lj + lt) / (li / g_i + lj / g_j + lt / g_t)
         return g_ij
-
 
     @staticmethod
     # this function the viscosity has not change
