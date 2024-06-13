@@ -153,79 +153,176 @@ class network(Base):
         args = parser.parse_args()
         return args.filename
 
+    # @staticmethod
+    # def vtk2network(path,keep_label=False):
+    #     vtk_type = path.split(".")[-1]
+    #     if vtk_type == "vtu":
+    #         import meshio
+    #         mesh = meshio.read(path)
+    #         # cell data
+    #         cell_keys = mesh.cell_data.keys()
+    #         cell_values = mesh.cell_data.values()
+    #         cell_data = dict(zip(cell_keys, [i[0] for i in cell_values]))
+    #
+    #         # point data
+    #         point_keys = mesh.point_data
+    #         point_values = mesh.point_data.values()
+    #         point_data = dict(zip(point_keys, [i[0] for i in point_values]))
+    #
+    #         all_data = {}
+    #         all_data.update(point_data)
+    #         all_data.update(cell_data)
+    #         for key in list(all_data.keys()):
+    #             if 'label' in key:
+    #                 if keep_label:
+    #                     if '|' in key:
+    #                         end_index = key.rindex("|")
+    #                         all_data[key[end_index+2:]] = (all_data.pop(key)).astype(bool)
+    #                 else:
+    #                     all_data[key]=all_data[key].astype(bool)
+    #             elif 'properties' in key:
+    #                 pass
+    #             else:
+    #                 pass
+    #         return all_data
+    #
+    #     elif vtk_type == "vtp":
+    #         import vtk
+    #         from vtkmodules.util import numpy_support
+    #         reader = vtk.vtkXMLPolyDataReader()
+    #         reader.SetFileName(path)
+    #         reader.Update()
+    #         point_data = reader.GetOutput().GetPointData()
+    #         point_data_count = point_data.GetNumberOfArrays()
+    #         point_data = {point_data.GetArrayName(i): numpy_support.vtk_to_numpy(point_data.GetArray(i)) for
+    #                       i in range(point_data_count)}
+    #
+    #         cell_data = reader.GetOutput().GetCellData()
+    #         cell_data_count = cell_data.GetNumberOfArrays()
+    #         cell_data = {cell_data.GetArrayName(i): numpy_support.vtk_to_numpy(cell_data.GetArray(i)) for i
+    #                      in range(cell_data_count)}
+    #
+    #         all_data = {}
+    #         all_data.update(point_data)
+    #         all_data.update(cell_data)
+    #
+    #         for key in list(all_data.keys()):
+    #             if 'label' in key:
+    #                 if keep_label:
+    #                     all_data[key]=all_data[key].astype(bool)
+    #                 else:
+    #                     if '|' in key:
+    #                         end_index = key.rindex("|")
+    #                         all_data[key[end_index+2:]] = (all_data.pop(key)).astype(bool)
+    #
+    #             elif 'properties' in key:
+    #                 if keep_label:
+    #                     pass
+    #                 else:
+    #                     if '|' in key:
+    #                         end_index = key.rindex("|")
+    #                         all_data[key[end_index+2:]] = (all_data.pop(key))
+    #             else:
+    #                 pass
+    #
+    #         return all_data
+
+
     @staticmethod
     def vtk2network(path,keep_label=False):
-        vtk_type = path.split(".")[-1]
-        if vtk_type == "vtu":
-            import meshio
-            mesh = meshio.read(path)
-            # cell data
-            cell_keys = mesh.cell_data.keys()
-            cell_values = mesh.cell_data.values()
-            cell_data = dict(zip(cell_keys, [i[0] for i in cell_values]))
+        prefix=['throat.','pore.']
+        dtype_map = {
+            "int8": "Int8",
+            "int16": "Int16",
+            "int32": "Int32",
+            "int64": "Int64",
+            "uint8": "UInt8",
+            "uint16": "UInt16",
+            "uint32": "UInt32",
+            "uint64": "UInt64",
+            "float32": "Float32",
+            "float64": "Float64",
+            "str": "String",
+        }
+        dtype_map={value:key for key,value in dtype_map.items()}
 
-            # point data
-            point_keys = mesh.point_data
-            point_values = mesh.point_data.values()
-            point_data = dict(zip(point_keys, [i[0] for i in point_values]))
 
-            all_data = {}
-            all_data.update(point_data)
-            all_data.update(cell_data)
-            for key in list(all_data.keys()):
-                if 'label' in key:
-                    if keep_label:
-                        if '|' in key:
-                            end_index = key.rindex("|")
-                            all_data[key[end_index+2:]] = (all_data.pop(key)).astype(bool)
-                    else:
-                        all_data[key]=all_data[key].astype(bool)
-                elif 'properties' in key:
+        with open(path, 'r') as f:
+            string_=f.read()
+        root=ET.fromstring(string_)
+        pn={}
+
+        Points_node=root.find('PolyData').find('Piece').find('Points')
+        for Points in Points_node:
+            Points_text=Points.text
+            Points_attrib=Points.attrib
+            if Points_attrib['Name'] == 'coords':
+                pn['pore.conns']=np.fromstring(Points_text,dtype=dtype_map[Points_attrib['type']],sep=' ').reshape((3,-1),order='F').T
+        Lines_node=root.find('PolyData').find('Piece').find('Lines')
+
+        for Lines in Lines_node:
+            Lines_text=Lines.text
+            Lines_attrib=Lines.attrib
+            if Lines_attrib['Name']=='connectivity':
+                pn['throat.conns']=np.fromstring(Lines_text,dtype=dtype_map[Lines_attrib['type']],sep=' ').reshape((-1,2))
+
+        PointData_node=root.find('PolyData').find('Piece').find('PointData')
+        for PointData in PointData_node:
+            PointData_text=PointData.text
+            PointData_attrib=PointData.attrib
+            pn[PointData_attrib['Name']]=np.fromstring(PointData_text,dtype=dtype_map[PointData_attrib['type']],sep=' ')
+
+        CellData_node=root.find('PolyData').find('Piece').find('CellData')
+        for CellData in CellData_node:
+            CellData_text=CellData.text
+            CellData_attrib=CellData.attrib
+            pn[CellData_attrib['Name']]=np.fromstring(CellData_text,dtype=dtype_map[CellData_attrib['type']],sep=' ')
+
+        for key in list(pn.keys()):
+            if 'label' in key:
+                if keep_label:
+                    pn[key] = pn[key].astype(bool)
+                else:
+                    if any(prefix_ in key for prefix_ in prefix):
+                        start_index=-1
+                        for prefix_ in prefix:
+                            start_index_temp = key.find(prefix_)
+                            if start_index==-1 and start_index_temp==-1:
+                                pass
+                            elif start_index==-1 and start_index_temp!=-1:
+                                start_index=start_index_temp
+                            elif start_index!=-1 and start_index_temp==-1:
+                                pass
+                            else:
+                                if start_index_temp<start_index:
+                                    start_index=start_index_temp
+                        pn[key[start_index:]] = (pn.pop(key)).astype(bool)
+
+            elif 'properties' in key:
+                if keep_label:
                     pass
                 else:
-                    pass
-            return all_data
+                    if any(prefix_ in key for prefix_ in prefix):
+                        start_index=-1
+                        for prefix_ in prefix:
+                            start_index_temp = key.find(prefix_)
+                            if start_index==-1 and start_index_temp==-1:
+                                pass
+                            elif start_index==-1 and start_index_temp!=-1:
+                                start_index=start_index_temp
+                            elif start_index!=-1 and start_index_temp==-1:
+                                pass
+                            else:
+                                if start_index_temp<start_index:
+                                    start_index=start_index_temp
+                        pn[key[start_index:]] = (pn.pop(key))
+            else:
+                pass
 
-        elif vtk_type == "vtp":
-            import vtk
-            from vtkmodules.util import numpy_support
-            reader = vtk.vtkXMLPolyDataReader()
-            reader.SetFileName(path)
-            reader.Update()
-            point_data = reader.GetOutput().GetPointData()
-            point_data_count = point_data.GetNumberOfArrays()
-            point_data = {point_data.GetArrayName(i): numpy_support.vtk_to_numpy(point_data.GetArray(i)) for
-                          i in range(point_data_count)}
+        return pn
 
-            cell_data = reader.GetOutput().GetCellData()
-            cell_data_count = cell_data.GetNumberOfArrays()
-            cell_data = {cell_data.GetArrayName(i): numpy_support.vtk_to_numpy(cell_data.GetArray(i)) for i
-                         in range(cell_data_count)}
 
-            all_data = {}
-            all_data.update(point_data)
-            all_data.update(cell_data)
 
-            for key in list(all_data.keys()):
-                if 'label' in key:
-                    if keep_label:
-                        all_data[key]=all_data[key].astype(bool)
-                    else:
-                        if '|' in key:
-                            end_index = key.rindex("|")
-                            all_data[key[end_index+2:]] = (all_data.pop(key)).astype(bool)
-
-                elif 'properties' in key:
-                    if keep_label:
-                        pass
-                    else:
-                        if '|' in key:
-                            end_index = key.rindex("|")
-                            all_data[key[end_index+2:]] = (all_data.pop(key))
-                else:
-                    pass
-
-            return all_data
 
     @staticmethod
     def array_to_element(name, array, n=1):
@@ -311,7 +408,7 @@ class network(Base):
             else:
                 if array.dtype == bool:
                     array = array.astype(int)
-                    key = str(network_name) + ' network | label || ' + key
+                    key = str(network_name) + 'network | label || ' + key
                 elif array.dtype == np.int32 or np.int64:
                     key = str(network_name) + 'network | properties || ' + key
                 if np.any(np.isnan(array)):
@@ -326,7 +423,6 @@ class network(Base):
                         continue
                     else:
                         array[np.isinf(array)] = fill_infs
-                # print(array)
                 element = network.array_to_element(key, array)
                 if array.size == num_points:
                     point_data_node.append(element)
@@ -345,5 +441,8 @@ class network(Base):
 
 
 if __name__ == '__main__':
-    path = '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
-    network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
+    # path = '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
+    # network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
+
+    pn=network.vtk2network(path=r'D:\yjp\OneDrive - zju.edu.cn\Code\ZJU\Study\Python\heat_tranfer\3D_Study\PNM\0.0010.vtp',keep_label=True)
+    print(pn.keys())
