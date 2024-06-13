@@ -7,9 +7,9 @@ Created on Thu Apr 14 17:00:02 2022
 """
 from mpnm._Base import *
 import numpy as np
-from vtkmodules.vtkIOXML import vtkXMLPolyDataReader
-from vtkmodules.util import numpy_support
-from vtkmodules.util.numpy_support import vtk_to_numpy
+# from vtkmodules.vtkIOXML import vtkXMLPolyDataReader
+# from vtkmodules.util import numpy_support
+# from vtkmodules.util.numpy_support import vtk_to_numpy
 import pandas as pd
 # import vtkmodules.all as vtk
 # from vtkmodules.util.numpy_support import numpy_to_vtk
