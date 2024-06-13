@@ -515,21 +515,27 @@ class topotools(Base):
     @staticmethod
     def trim_pore(pn, pores=None, throats=None, bound_cond=False):
         if pores is None:
-            pores = []
+            pores = np.array([],dtype=int)
         if throats is None:
-            throats = []
+            throats = np.array([],dtype=int)
+        if not isinstance(pores,np.ndarray):
+            pores=np.array(pores)
+        if not isinstance(throats,np.ndarray):
+            throats=np.array(throats)
         backup = {}
         backup.update(pn)
+        throats_isolated = np.where(np.any(np.isin(backup['throat.conns'], pores), axis=1))[0]
+        throats=np.append(throats,throats_isolated)
         for i in pn:
             if 'pore' in i and 'throat' not in i:
                 backup[i] = np.delete(backup[i], pores, axis=0)
             if 'throat' in i:
                 backup[i] = np.delete(backup[i], throats, axis=0)
 
-        isothroat = np.where(np.any(np.isin(backup['throat.conns'], pores), axis=1))[0]
+        pores_isolated=np.where(np.isin(backup['pore._id'],backup['throat.conns'])==False)[0]
         for i in pn:
-            if 'throat' in i:
-                backup[i] = np.delete(backup[i], isothroat, axis=0)
+            if 'pore' in i and 'throat' not in i:
+                backup[i] = np.delete(backup[i], pores_isolated, axis=0)
 
         backup['pore._id'] = np.arange(len(backup['pore.all']))
         backup['throat._id'] = np.arange(len(backup['throat.all']))
