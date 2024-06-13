@@ -441,8 +441,7 @@ class network(Base):
 
 
 if __name__ == '__main__':
-    # path = '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
-    # network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
-
-    pn=network.vtk2network(path=r'D:\yjp\OneDrive - zju.edu.cn\Code\ZJU\Study\Python\heat_tranfer\3D_Study\PNM\0.0010.vtp',keep_label=True)
+    path = '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
+    network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
+    pn=network.vtk2network(path='../Samples/single_phase_flow/single_phase_permeability.vtp')
     print(pn.keys())
