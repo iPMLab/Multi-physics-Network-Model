@@ -154,7 +154,7 @@ class network(Base):
         return args.filename
 
     @staticmethod
-    def vtk2network(path):
+    def vtk2network(path,keep_label=False):
         vtk_type = path.split(".")[-1]
         if vtk_type == "vtu":
             import meshio
@@ -172,6 +172,18 @@ class network(Base):
             all_data = {}
             all_data.update(point_data)
             all_data.update(cell_data)
+            for key in list(all_data.keys()):
+                if 'label' in key:
+                    if keep_label:
+                        if '|' in key:
+                            end_index = key.rindex("|")
+                            all_data[key[end_index+2:]] = (all_data.pop(key)).astype(bool)
+                    else:
+                        all_data[key]=all_data[key].astype(bool)
+                elif 'properties' in key:
+                    pass
+                else:
+                    pass
             return all_data
 
         elif vtk_type == "vtp":
@@ -193,6 +205,26 @@ class network(Base):
             all_data = {}
             all_data.update(point_data)
             all_data.update(cell_data)
+
+            for key in list(all_data.keys()):
+                if 'label' in key:
+                    if keep_label:
+                        all_data[key]=all_data[key].astype(bool)
+                    else:
+                        if '|' in key:
+                            end_index = key.rindex("|")
+                            all_data[key[end_index+2:]] = (all_data.pop(key)).astype(bool)
+
+                elif 'properties' in key:
+                    if keep_label:
+                        pass
+                    else:
+                        if '|' in key:
+                            end_index = key.rindex("|")
+                            all_data[key[end_index+2:]] = (all_data.pop(key))
+                else:
+                    pass
+
             return all_data
 
     @staticmethod
@@ -244,12 +276,12 @@ class network(Base):
             </PolyData>
         </VTKFile>
         """.strip()
-        d = globals()
-        network_name = ''
-        for key in d:
-            if type(d[key]) is type(pn) and d[key] == pn:
-                network_name = key
-
+        # d = globals()
+        # network_name = ''
+        # for key in d:
+        #     if type(d[key]) is type(pn) and d[key] == pn:
+        #         network_name = key
+        network_name=''
         key_list = list(pn.keys())
 
         points = pn["pore.coords"]
@@ -279,9 +311,9 @@ class network(Base):
             else:
                 if array.dtype == bool:
                     array = array.astype(int)
-                    key = str(network_name) + ' network| label || ' + key
+                    key = str(network_name) + ' network | label || ' + key
                 elif array.dtype == np.int32 or np.int64:
-                    key = str(network_name) + 'network| properties|| ' + key
+                    key = str(network_name) + 'network | properties || ' + key
                 if np.any(np.isnan(array)):
                     if fill_nans is None:
                         logger.warning(key + " has nans," + " will not write to file")
