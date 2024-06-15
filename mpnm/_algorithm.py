@@ -96,7 +96,7 @@ class algorithm(Base):
         return Profile
     
     @staticmethod
-    def stead_stay_alg(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
+    def stead_stay_alg(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond=False):
         # num_pore = len(pn['pore.all'])
 
         num_pore=len(pn['pore.all'])

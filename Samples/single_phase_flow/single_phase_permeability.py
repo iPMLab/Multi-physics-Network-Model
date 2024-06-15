@@ -26,11 +26,11 @@ opt = parser.parse_args()
 t0 = time.time()
 path = opt.Networkfile
 name = opt.Networkname
-pn_o = network.read_network(path=path, name=name,calculate_shape_factor=True,remove_in_out_throats=False)
+pn_o = network.read_network(path=path, name=name,calculate_shape_factor=True,remove_in_out_throats=True)
 
-health = topotools.pore_health(pn_o,equal=True)
+# health = topotools.pore_health(pn_o,equal=True)
 # print(health)
-pn_o = topotools.trim_pore(pn_o, health['single_pore'], health['single_throat'])
+# pn_o = topotools.trim_pore(pn_o, health['single_pore'], health['single_throat'])
 # pn=op.network.GenericNetwork(name='pn')
 # pn.update(back)
 pn = {}
@@ -80,7 +80,7 @@ Boundary_condition_P['pore_outlet'] = {'pore.outlets': [0, 'Dirichlet']}
 
 coe_A = np.array(topotools.Mass_conductivity(pn)) / pn['throat.total_length']
 coe_A_P = coe_A
-Profile = algorithm.stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, resolution, bound_cond)
+Profile = algorithm.stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, resolution, False)
 throat_conns=pn['throat.conns']
 delta_p=Profile[throat_conns[:,1]]-Profile[throat_conns[:,0]]
 flux_Throat_profile = delta_p * coe_A

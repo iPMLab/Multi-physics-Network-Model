@@ -14,7 +14,7 @@ from mpnm.tools_numba import *
 import scipy.spatial as spt
 import numba as nb
 import os
-
+import numexpr as ne
 num_threads = os.environ.get('num_threads')
 if num_threads == None:
     pass
@@ -1086,13 +1086,29 @@ class topotools(Base):
         # total_information[:,3]=-1
         total_information = total_information[np.argsort(total_information[:, 0])]
         elements, counts = np.unique(total_information[:, 0], return_counts=True)
+        indices=np.cumsum(counts)
+        # print(elements)
+        start=np.zeros(len(elements))
+        start[1:]=indices[:-1]
         start = np.concatenate((np.array([0]), np.cumsum(counts)[0:-1]), axis=0)
         end = np.cumsum(counts)
-        start2end = -np.ones((len(pn['pore._id']), 2), dtype=np.int64)
-        start2end[elements] = np.concatenate((np.array([start]).T, np.array([end]).T), axis=1)
-        total_information[:, 3] = np.where(
-            pn['pore.void'][total_information[:, 0]] & pn['pore.void'][total_information[:, 1]], 0, np.where(
-                pn['pore.solid'][total_information[:, 0]] & pn['pore.solid'][total_information[:, 1]], 1, 2))
+        # start2end = -np.ones((len(pn['pore._id']), 2), dtype=np.int64)
+        # start2end[elements] = np.concatenate((np.array([start]).T, np.array([end]).T), axis=1)
+        start2end=np.empty((len(pn['pore._id']), 2),dtype=int)
+        start2end[:,0]=start
+        start2end[:,1]=end
+        pore_void_0=pn['pore.void'][total_information[:, 0]]
+        pore_void_1=pn['pore.void'][total_information[:, 1]]
+        pore_solid_0=pn['pore.solid'][total_information[:, 0]]
+        pore_solid_1=pn['pore.solid'][total_information[:, 1]]
+        total_information[:, 3] = 2
+        total_information_3=total_information[:, 3]
+
+        # total_information[:, 3] = np.where(
+        #     pn['pore.void'][total_information[:, 0]] & pn['pore.void'][total_information[:, 1]], 0, np.where(
+        #         pn['pore.solid'][total_information[:, 0]] & pn['pore.solid'][total_information[:, 1]], 1, 2))
+        total_information[:,3]=ne.evaluate('where(pore_void_0&pore_void_1,0,total_information_3)')
+        total_information[:,3]=ne.evaluate('where(pore_solid_0&pore_solid_1,1,total_information_3)')
 
         temp = {'inner_info': total_information, 'inner_start2end': start2end}
         pn.update(temp)
