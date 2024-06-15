@@ -21,8 +21,8 @@ if num_threads == None:
 else:
     nb.set_num_threads(int(num_threads))
 
-if 'update_pore_info' not in os.environ.keys():
-    os.environ['update_pore_info'] = 'False'
+if 'update_inner_info' not in os.environ.keys():
+    os.environ['update_inner_info'] = 'False'
 
 
 def check_input(**kwarg):
@@ -31,16 +31,16 @@ def check_input(**kwarg):
             kwarg['pn']['pore.solid'] = np.zeros_like(kwarg['pn']['pore.void'])
         else:
             pass
-        if 'pore.info' not in kwarg['pn']:
-            kwarg['pn'].update(topotools().update_pore_info(kwarg['pn']))
+        if 'inner_info' not in kwarg['pn']:
+            kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
         else:
             pass
-        if 'pore.start2end' not in kwarg['pn']:
-            kwarg['pn'].update(topotools().update_pore_info(kwarg['pn']))
+        if 'inner_start2end' not in kwarg['pn']:
+            kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
         else:
             pass
-        if os.environ['update_pore_info'] == 'True':
-            kwarg['pn'].update(topotools().update_pore_info(kwarg['pn']))
+        if os.environ['update_inner_info'] == 'True':
+            kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
         if 'ids' in kwarg:
             if isinstance(kwarg['ids'], np.ndarray):
                 ids = kwarg['ids']
@@ -726,12 +726,12 @@ class topotools(Base):
         ids = check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         result = species_balance_conv_nb(pn['throat.radius'], pn['throat.length'], pn['throat.Cp'],
                                          pn['throat.density'], g_ij, Tem, thermal_con_dual, P_profile, ids,
                                          network_pore_void, network_pore_solid, pn['throat.conns'],
-                                         pore_info, pore_start2end)
+                                         inner_info, inner_start2end)
 
         if len(ids) == 1:
             return result[0]
@@ -743,8 +743,8 @@ class topotools(Base):
         check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         output = {}
         total = 0
         for m in Boundary_condition:
@@ -754,7 +754,7 @@ class topotools(Base):
                                                  pn['throat.density'], g_ij, Tem_c, thermal_con_dual, P_profile,
                                                  pn['pore._id'][pn[n]], network_pore_void,
                                                  network_pore_solid,
-                                                 pn['throat.conns'], pore_info, pore_start2end)[:, 0]
+                                                 pn['throat.conns'], inner_info, inner_start2end)[:, 0]
                 output.update({n: np.sum(result)})
         for i in output:
             total += output[i]
@@ -766,13 +766,13 @@ class topotools(Base):
         ids = check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         result = energy_balance_conv_nb(pn['throat.radius'], pn['throat.length'],
                                         pn['throat.Cp'],
                                         pn['throat.density'], g_ij, Tem, thermal_con_dual, P_profile, ids,
                                         network_pore_void,
-                                        network_pore_solid, pn['throat.conns'], pore_info, pore_start2end)
+                                        network_pore_solid, pn['throat.conns'], inner_info, inner_start2end)
 
         if len(ids) == 1:
             return result[0]
@@ -784,8 +784,8 @@ class topotools(Base):
         check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         output = {}
         total = 0
         for m in Boundary_condition:
@@ -795,7 +795,7 @@ class topotools(Base):
                                                 pn['throat.density'], g_ij, Tem_c, thermal_con_dual, P_profile,
                                                 pn['pore._id'][pn[n]], network_pore_void,
                                                 network_pore_solid,
-                                                pn['throat.conns'], pore_info, pore_start2end)[:, 0]
+                                                pn['throat.conns'], inner_info, inner_start2end)[:, 0]
                 output.update({n: np.sum(result)})
         for i in output:
             total += output[i]
@@ -807,11 +807,11 @@ class topotools(Base):
         ids = check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         result = mass_balance_conv_nb(g_ij, P_profile, ids, network_pore_void,
                                       network_pore_solid,
-                                      pn['throat.conns'], pore_info, pore_start2end)
+                                      pn['throat.conns'], inner_info, inner_start2end)
 
         if len(ids) == 1:
             return result[0]
@@ -846,11 +846,11 @@ class topotools(Base):
         check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         result = mass_balance_conv_nb(g_ij, P_profile, pn['pore._id'], network_pore_void,
                                       network_pore_solid,
-                                      pn['throat.conns'], pore_info, pore_start2end)
+                                      pn['throat.conns'], inner_info, inner_start2end)
         output = {}
         total = 0
         for m in Boundary_condition:
@@ -867,12 +867,12 @@ class topotools(Base):
         ids = check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         result = cal_pore_veloc_nb(pn['throat.area'], pn['pore.radius'], pn['pore.real_shape_factor'],
                                    g_ij, P_profile, ids, network_pore_void,
                                    network_pore_solid,
-                                   pn['throat.conns'], pore_info, pore_start2end)
+                                   pn['throat.conns'], inner_info, inner_start2end)
 
         if len(ids) == 1:
             return result[0]
@@ -884,11 +884,11 @@ class topotools(Base):
         check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
-        pore_info = pn['pore.info']
-        pore_start2end = pn['pore.start2end']
+        inner_info = pn['inner_info']
+        inner_start2end = pn['inner_start2end']
         result = mass_balance_conv_nb(g_ij, P_profile, pn['pore._id'], network_pore_void,
                                       network_pore_solid,
-                                      pn['throat.conns'], pore_info, pore_start2end)
+                                      pn['throat.conns'], inner_info, inner_start2end)
         return result
 
     '''
@@ -1060,7 +1060,7 @@ class topotools(Base):
         return pn
 
     @staticmethod
-    def update_pore_info(pn):
+    def update_inner_info(pn):
         print('Updating pore conns information')
         '''
         0=Pore, 1=Solid, 2=Interface
@@ -1094,7 +1094,7 @@ class topotools(Base):
             pn['pore.void'][total_information[:, 0]] & pn['pore.void'][total_information[:, 1]], 0, np.where(
                 pn['pore.solid'][total_information[:, 0]] & pn['pore.solid'][total_information[:, 1]], 1, 2))
 
-        temp = {'pore.info': total_information, 'pore.start2end': start2end}
+        temp = {'inner_info': total_information, 'inner_start2end': start2end}
         pn.update(temp)
         print('Finished updating pore info')
         return pn
