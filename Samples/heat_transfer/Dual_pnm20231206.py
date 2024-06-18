@@ -58,7 +58,7 @@ sample_data_root = '../../sample_data/Sphere_stacking_250_500_2800_20/'
 path = sample_data_root + 'pore_network'
 # project = op.io.Statoil.load(path=path, prefix='sphere_stacking_250_500_2800_20')
 
-project = net.read_network(path=path, name='sphere_stacking_250_500_2800_20',remove_in_out_throats=False)
+project = net.read_network(path=path, name='sphere_stacking_250_500_2800_20',remove_in_out_throats=True)
 pn_o = project
 # pn_o.name = 'pore'
 # pn['pore._id']=np.arange(len(pn['pore._id']))

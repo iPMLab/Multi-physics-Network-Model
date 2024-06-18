@@ -5,11 +5,10 @@ Created on Tue Apr 26 21:22:24 2022
 
 @author: htmt
 """
-from mpnm import network,topotools,algorithm
+from mpnm import network, topotools, algorithm
 import numpy as np
 import argparse
 import time
-
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--Networkfile', default='../../sample_data/Bead_packing', help='input network path')
@@ -26,15 +25,12 @@ opt = parser.parse_args()
 t0 = time.time()
 path = opt.Networkfile
 name = opt.Networkname
-pn_o = network.read_network(path=path, name=name,calculate_shape_factor=True,remove_in_out_throats=True)
+pn = network.read_network(path=path, name=name, calculate_shape_factor=True)
+health = topotools.pore_health(pn, equal=True)
+pn = topotools.trim_pore(pn, health['single_pore'], health['single_throat'])
 
-# health = topotools.pore_health(pn_o,equal=True)
-# print(health)
-# pn_o = topotools.trim_pore(pn_o, health['single_pore'], health['single_throat'])
 # pn=op.network.GenericNetwork(name='pn')
 # pn.update(back)
-pn = {}
-pn.update(pn_o)
 
 imsize = np.array(opt.imsize)
 resolution = opt.resolution
@@ -51,27 +47,25 @@ pn['throat.void'] = pn['throat.all']
 pn['pore.void'] = pn['pore.all']
 pn['pore._id'] = np.arange(len(pn['pore._id']))
 pn['throat._id'] = np.arange(len(pn['throat._id']))
-Pores = np.loadtxt(path + '/' + name + '_node2.dat')
-Pores1 = np.loadtxt(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4))
-Pores = Pores[Pores1[:, 4] > 0, :]
-nonIsolatedPores = Pores[:, 0]
-newPore = np.zeros(len(Pores1[:, 0]))
-temp = np.arange(len(nonIsolatedPores))
-
-newPore[Pores1[:, 4] > 0] = temp
-Throats1 = np.loadtxt(path + '/' + name + '_link1.dat', skiprows=1)
-Throats2 = np.loadtxt(path + '/' + name + '_link2.dat')
-throat_inlet2 = Throats2[Throats1[:, 1] == -1]
-throat_inlet1 = Throats1[Throats1[:, 1] == -1]
-throat_outlet2 = Throats2[Throats1[:, 1] == 0]
-throat_outlet1 = Throats1[Throats1[:, 1] == 0]
-
-throat_inlet_cond = topotools().Boundary_cond_cal(pn, throat_inlet1, throat_inlet2, fluid, newPore, Pores)
-throat_outlet_cond = topotools().Boundary_cond_cal(pn, throat_outlet1, throat_outlet2, fluid, newPore, Pores)
-bound_cond = {}
-bound_cond['throat_inlet_cond'] = throat_inlet_cond
-bound_cond['throat_outlet_cond'] = throat_outlet_cond
-
+# Pores = np.loadtxt(path + '/' + name + '_node2.dat')
+# Pores1 = np.loadtxt(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4))
+# Pores = Pores[Pores1[:, 4] > 0, :]
+# nonIsolatedPores = Pores[:, 0]
+# newPore = np.zeros(len(Pores1[:, 0]))
+# temp = np.arange(len(nonIsolatedPores))
+#
+# newPore[Pores1[:, 4] > 0] = temp
+# Throats1 = np.loadtxt(path + '/' + name + '_link1.dat', skiprows=1)
+# Throats2 = np.loadtxt(path + '/' + name + '_link2.dat')
+# throat_inlet2 = Throats2[Throats1[:, 1] == -1]
+# throat_inlet1 = Throats1[Throats1[:, 1] == -1]
+# throat_outlet2 = Throats2[Throats1[:, 1] == 0]
+# throat_outlet1 = Throats1[Throats1[:, 1] == 0]
+# throat_inlet_cond = topotools().Boundary_cond_cal(pn, throat_inlet1, throat_inlet2, fluid, newPore, Pores)
+# throat_outlet_cond = topotools().Boundary_cond_cal(pn, throat_outlet1, throat_outlet2, fluid, newPore, Pores)
+# bound_cond = {}
+# bound_cond['throat_inlet_cond'] = throat_inlet_cond
+# bound_cond['throat_outlet_cond'] = throat_outlet_cond
 
 model_res = []
 Boundary_condition_P = {}
@@ -80,9 +74,10 @@ Boundary_condition_P['pore_outlet'] = {'pore.outlets': [0, 'Dirichlet']}
 
 coe_A = np.array(topotools.Mass_conductivity(pn)) / pn['throat.total_length']
 coe_A_P = coe_A
-Profile = algorithm.stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, resolution, False)
-throat_conns=pn['throat.conns']
-delta_p=Profile[throat_conns[:,1]]-Profile[throat_conns[:,0]]
+Profile = algorithm.stead_stay_alg(pn, fluid, coe_A, Boundary_condition_P, resolution,
+                                   False)  # Boundary condition calculations
+throat_conns = pn['throat.conns']
+delta_p = Profile[throat_conns[:, 1]] - Profile[throat_conns[:, 0]]
 flux_Throat_profile = delta_p * coe_A
 Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 * 4 * pn['throat.real_shape_factor']
 output = topotools.calculate_mass_flow(pn, Boundary_condition_P, coe_A_P, Profile, 8)
@@ -95,4 +90,4 @@ print('Absolute permeability', abs_perm)
 print('inlet velocity', output['pore.inlets'] / (imsize[1] * imsize[2] * resolution ** 2))
 t1 = time.time()
 print('using time', t1 - t0, 's')
-network.network2vtk(pn,'single_phase_permeability')
+network.network2vtk(pn, 'single_phase_permeability')

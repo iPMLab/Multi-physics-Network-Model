@@ -6,7 +6,6 @@ Created on Thu Apr 14 16:55:27 2022
 @author: htmt
 """
 import numpy as np
-# import openpnm as op
 from mpnm._Base import *
 import copy
 from scipy.sparse import coo_matrix
@@ -15,11 +14,6 @@ import scipy.spatial as spt
 import numba as nb
 import os
 import numexpr as ne
-num_threads = os.environ.get('num_threads')
-if num_threads == None:
-    pass
-else:
-    nb.set_num_threads(int(num_threads))
 
 if 'update_inner_info' not in os.environ.keys():
     os.environ['update_inner_info'] = 'False'
@@ -476,6 +470,9 @@ class topotools(Base):
 
     @staticmethod
     def pore_health(pn, connections=1, equal=False):
+        '''
+        remove pores, which connections<1
+        '''
         pores_in_conns, counts = np.unique(pn['throat.conns'], return_counts=True)
         if equal:
             pores_in_conns = pores_in_conns[counts >= connections]
@@ -513,52 +510,53 @@ class topotools(Base):
         return health
 
     @staticmethod
-    def trim_pore(pn, pores=None, throats=None, bound_cond=False):
+    def trim_pore(pn, pores=None, throats=None, remove_iso_pore=True, keep_inlets_outlets=False, inplace=False):
         if pores is None:
-            pores = np.array([],dtype=int)
+            pores = np.array([], dtype=int)
         if throats is None:
-            throats = np.array([],dtype=int)
-        if not isinstance(pores,np.ndarray):
-            pores=np.array(pores)
-        if not isinstance(throats,np.ndarray):
-            throats=np.array(throats)
-        backup = {}
-        backup.update(pn)
+            throats = np.array([], dtype=int)
+        if not isinstance(pores, np.ndarray):
+            pores = np.array(pores)
+        if not isinstance(throats, np.ndarray):
+            throats = np.array(throats)
+        if inplace:
+            backup = pn
+        else:
+            backup = pn.copy()
         throats_isolated = np.where(np.any(np.isin(backup['throat.conns'], pores), axis=1))[0]
-        throats=np.append(throats,throats_isolated)
+        throats = np.append(throats, throats_isolated)
         for i in pn:
             if 'pore' in i and 'throat' not in i:
                 backup[i] = np.delete(backup[i], pores, axis=0)
             if 'throat' in i:
                 backup[i] = np.delete(backup[i], throats, axis=0)
 
-        pores_isolated=np.where(np.isin(backup['pore._id'],backup['throat.conns'])==False)[0]
-        for i in pn:
-            if 'pore' in i and 'throat' not in i:
-                backup[i] = np.delete(backup[i], pores_isolated, axis=0)
+        if remove_iso_pore:
+            pores_isolated = np.where(np.isin(backup['pore.label'], backup['throat.conns']) == False)[0]
+            if len(pores_isolated) > 0:
+                print('Find isolated %d pore' % len(pores_isolated))
+                for i in pn:
+                    if 'pore' in i and 'throat' not in i:
+                        backup[i] = np.delete(backup[i], pores_isolated, axis=0)
 
         backup['pore._id'] = np.arange(len(backup['pore.all']))
         backup['throat._id'] = np.arange(len(backup['throat.all']))
-        index_th = backup['throat._id'][(backup['throat.conns'][:, 0] >= 0)]
-        throat_internal = backup['throat.conns'][(backup['throat.conns'][:, 0] >= 0)]
-        index = np.digitize(throat_internal[:, 0], backup['pore.label']) - 1
-        # throat_internal[:, 0] = backup['pore._id'][index]
-        throat_internal[:, 0]=index
-        # throat_internal[:, 0] = np.argsort(throat_internal[:, 0])
-        index = np.digitize(throat_internal[:, 1], backup['pore.label']) - 1
-        # throat_internal[:, 1] = backup['pore._id'][index]
-        throat_internal[:, 1] = index
-        if bound_cond:
-            throat_out_in = backup['throat.conns'][(backup['throat.conns'][:, 0] < 0)]
-            index = np.digitize(throat_out_in[:, 1], backup['pore.label']) - 1
-            throat_out_in[:, 1] = backup['pore._id'][index]
+        throat_internal_index = backup['throat._id'][(backup['throat.conns'][:, 0] >= 0)]
+        '''
+        https://stackoverflow.com/questions/13572448/replace-values-of-a-numpy-index-array-with-values-of-a-list
+        pore.label is assumed sorted
+        '''
+        backup['throat.conns'][:, 0][throat_internal_index] = np.digitize(
+            backup['throat.conns'][:, 0][throat_internal_index], backup['pore.label']) - 1
+        backup['throat.conns'][:, 1] = np.digitize(backup['throat.conns'][:, 1], backup['pore.label']) - 1
 
-            backup['throat.conns'] = np.concatenate((throat_out_in, throat_internal), axis=0)
+        if keep_inlets_outlets:
+            pass
         else:
-            backup['throat.conns'] = throat_internal
-        for i in pn:
-            if 'throat' in i and 'conns' not in i:
-                backup[i] = backup[i][index_th]
+            backup['throat.conns'] = backup['throat.conns'][throat_internal_index]
+            for i in pn:
+                if 'throat' in i and 'conns' not in i:
+                    backup[i] = backup[i][throat_internal_index]
 
         backup['throat._id'] = np.arange(len(backup['throat.all']))
         backup['pore.label'] = np.arange(len(backup['pore.all']))
@@ -1086,29 +1084,28 @@ class topotools(Base):
         # total_information[:,3]=-1
         total_information = total_information[np.argsort(total_information[:, 0])]
         elements, counts = np.unique(total_information[:, 0], return_counts=True)
-        indices=np.cumsum(counts)
+        indices = np.cumsum(counts)
         # print(elements)
-        start=np.zeros(len(elements))
-        start[1:]=indices[:-1]
-        start = np.concatenate((np.array([0]), np.cumsum(counts)[0:-1]), axis=0)
-        end = np.cumsum(counts)
-        # start2end = -np.ones((len(pn['pore._id']), 2), dtype=np.int64)
+        start = np.zeros(len(elements))
+        start[1:] = indices[:-1]
+        end = indices
+        start2end = -np.ones((len(pn['pore._id']), 2), dtype=np.int64)
         # start2end[elements] = np.concatenate((np.array([start]).T, np.array([end]).T), axis=1)
-        start2end=np.empty((len(pn['pore._id']), 2),dtype=int)
-        start2end[:,0]=start
-        start2end[:,1]=end
-        pore_void_0=pn['pore.void'][total_information[:, 0]]
-        pore_void_1=pn['pore.void'][total_information[:, 1]]
-        pore_solid_0=pn['pore.solid'][total_information[:, 0]]
-        pore_solid_1=pn['pore.solid'][total_information[:, 1]]
+        # start2end = np.empty((len(elements), 2), dtype=int)
+        start2end[:, 0][elements] = start
+        start2end[:, 1][elements] = end
+        pore_void_0 = pn['pore.void'][total_information[:, 0]]
+        pore_void_1 = pn['pore.void'][total_information[:, 1]]
+        pore_solid_0 = pn['pore.solid'][total_information[:, 0]]
+        pore_solid_1 = pn['pore.solid'][total_information[:, 1]]
         total_information[:, 3] = 2
-        total_information_3=total_information[:, 3]
+        total_information_3 = total_information[:, 3]
 
         # total_information[:, 3] = np.where(
         #     pn['pore.void'][total_information[:, 0]] & pn['pore.void'][total_information[:, 1]], 0, np.where(
         #         pn['pore.solid'][total_information[:, 0]] & pn['pore.solid'][total_information[:, 1]], 1, 2))
-        total_information[:,3]=ne.evaluate('where(pore_void_0&pore_void_1,0,total_information_3)')
-        total_information[:,3]=ne.evaluate('where(pore_solid_0&pore_solid_1,1,total_information_3)')
+        total_information[:, 3] = ne.evaluate('where(pore_void_0&pore_void_1,0,total_information_3)')
+        total_information[:, 3] = ne.evaluate('where(pore_solid_0&pore_solid_1,1,total_information_3)')
 
         temp = {'inner_info': total_information, 'inner_start2end': start2end}
         pn.update(temp)

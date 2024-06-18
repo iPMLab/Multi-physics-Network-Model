@@ -53,17 +53,17 @@ def find_neighbor_ball_nb(network_pore_void, network_pore_solid, network_throat_
 
 
 @nb.njit(parallel=False, cache=True, fastmath=True, nogil=True)
-def find_neighbor_ball_information_nb(pore_throat_conns, start2end, a):
-    if start2end[a,0] == -1:
+def find_neighbor_ball_information_nb(pore_throat_conns, inner_start2end, a):
+    if inner_start2end[a,0] == -1:
         void = np.array([[-1]])
         solid = np.array([[-1]])
         interface = np.array([[-1]])
         return [void, solid, interface]
     else:
-        pore_throat_conns_i = pore_throat_conns[start2end[a,0]:start2end[a,1]]
-        void = pore_throat_conns_i[pore_throat_conns_i[:, 3] == 0]
-        solid = pore_throat_conns_i[pore_throat_conns_i[:, 3] == 1]
-        interface = pore_throat_conns_i[pore_throat_conns_i[:, 3] == 2]
+        inner_info = pore_throat_conns[inner_start2end[a,0]:inner_start2end[a,1]]
+        void = inner_info[inner_info[:, 3] == 0]
+        solid = inner_info[inner_info[:, 3] == 1]
+        interface = inner_info[inner_info[:, 3] == 2]
         if len(void) == 0:
             void = np.array([[-1]])
         if len(solid) == 0:
@@ -74,11 +74,11 @@ def find_neighbor_ball_information_nb(pore_throat_conns, start2end, a):
 
 
 @nb.njit(parallel=True, cache=True, fastmath=True, nogil=True)
-def mass_balance_conv_nb( g_ij, P_profile, ids,network_pore_void, network_pore_solid, network_throat_conns, pore_throat_conns, start2end):
+def mass_balance_conv_nb( g_ij, P_profile, ids,network_pore_void, network_pore_solid, network_throat_conns, pore_throat_conns, inner_start2end):
     result = np.zeros(len(ids), dtype=np.float64)
     for i in nb.prange(len(ids)):
         pore_id = ids[i]
-        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, start2end, pore_id)
+        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, inner_start2end, pore_id)
         if void[0, 0] == -1:
             result[i] = 0
         else:
@@ -95,12 +95,12 @@ def mass_balance_conv_nb( g_ij, P_profile, ids,network_pore_void, network_pore_s
 
 @nb.njit(parallel=True, cache=True, fastmath=True, nogil=True)
 def cal_pore_veloc_nb(network_throat_area, network_pore_radius, network_pore_real_shape_factor, g_ij, P_profile, ids,
-                      network_pore_void, network_pore_solid, network_throat_conns, pore_throat_conns, start2end):
+                      network_pore_void, network_pore_solid, network_throat_conns, pore_throat_conns, inner_start2end):
     # res=find_neighbor_ball(network,[a])
     result = np.zeros(len(ids), dtype=np.float64)
     for i in nb.prange(len(ids)):
         pore_id = ids[i]
-        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, start2end, pore_id)
+        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, inner_start2end, pore_id)
         if void[0, 0] == -1:
             result[i] = 0
         else:
@@ -138,12 +138,12 @@ def cal_pore_veloc_nb(network_throat_area, network_pore_radius, network_pore_rea
 @nb.njit(parallel=True, cache=True, fastmath=True, nogil=True)
 def species_balance_conv_nb(network_throat_radius, network_throat_length, network_throat_Cp, network_throat_density, g_ij, Tem,
                             thermal_con_dual, P_profile, ids, network_pore_void,
-                            network_pore_solid,network_throat_conns, pore_throat_conns, start2end):
+                            network_pore_solid,network_throat_conns, pore_throat_conns, inner_start2end):
     result = np.zeros((len(ids), 5), dtype=np.float64)
     # res=find_neighbor_ball(network,[a])
     for i in nb.prange(len(ids)):
         pore_id = ids[i]
-        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, start2end, pore_id)
+        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, inner_start2end, pore_id)
         # g_ij=H_P_fun(network['throat.radius'],network['throat.length'],fluid['viscosity'])
 
         # g_ij*=network['throat.void']
@@ -206,11 +206,11 @@ def species_balance_conv_nb(network_throat_radius, network_throat_length, networ
 @nb.njit(parallel=True, cache=True, fastmath=True, nogil=True)
 def energy_balance_conv_nb(network_throat_radius, network_throat_length, network_throat_Cp, network_throat_density, g_ij, Tem,
                            thermal_con_dual, P_profile, ids, network_pore_void, network_pore_solid, network_throat_conns,
-                           pore_throat_conns, start2end):
+                           pore_throat_conns, inner_start2end):
     result = np.zeros((len(ids), 5), dtype=np.float64)
     for i in nb.prange(len(ids)):
         pore_id = ids[i]
-        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, start2end, pore_id)
+        void, solid, interface = find_neighbor_ball_information_nb(pore_throat_conns, inner_start2end, pore_id)
         # g_ij=H_P_fun(network['throat.radius'],network['throat.length'],fluid['viscosity'])
 
         # g_ij*=network['throat.void']
@@ -273,11 +273,11 @@ def energy_balance_conv_nb(network_throat_radius, network_throat_length, network
 
 @nb.njit(parallel=True, cache=True, fastmath=True, nogil=True)
 def update_pore_throat_conns_nb(network_pore_void, network_pore_solid, network_throat_conns, a, result, elements,
-                                     total_information, start2end):
+                                     total_information, inner_start2end):
     # information = np.zeros_like(total_information,dtype=np.int64)-1
     for i in nb.prange(len(elements)):
         pore_id = elements[i]
-        total_information_i = total_information[start2end[pore_id][0]:start2end[pore_id][1]]
+        total_information_i = total_information[inner_start2end[pore_id][0]:inner_start2end[pore_id][1]]
         if network_pore_void[pore_id]:
             bool_void = network_pore_void[total_information_i[:, 1]]
             total_information_i[:, 3] = np.where(bool_void, 0, 2)
@@ -285,4 +285,4 @@ def update_pore_throat_conns_nb(network_pore_void, network_pore_solid, network_t
         elif network_pore_solid[pore_id]:
             bool_solid = network_pore_solid[total_information_i[:, 1]]
             total_information_i[:, 3] = np.where(bool_solid, 1, 2)
-        total_information[start2end[pore_id][0]:start2end[pore_id][1]] = total_information_i
+        total_information[inner_start2end[pore_id][0]:inner_start2end[pore_id][1]] = total_information_i

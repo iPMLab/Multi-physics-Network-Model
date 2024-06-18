@@ -27,17 +27,21 @@ class network(Base):
         pass
 
     @staticmethod
-    def read_network(path=None, name=None,prefix=None,calculate_shape_factor=False,remove_in_out_throats=True):
-        name = name if name !=None else prefix
+    def read_network(path=None, name=None, prefix=None, calculate_shape_factor=False, remove_in_out_throats=True):
+        name = name if name != None else prefix
         # conclude the throats and pores
-        Throats1=pd.read_csv(path + '/' + name + "_link1.dat", skiprows=1,names=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
-                                         'total_length'],sep='\s+')
-        Throats2=pd.read_csv(path + '/' + name + "_link2.dat", names=['index', 'pore_1_index', 'pore_2_index', 'conduit_lengths_pore1',
-                                         'conduit_lengths_pore2', 'length', 'volume', 'clay_volume'],sep='\s+')
+        Throats1 = pd.read_csv(path + '/' + name + "_link1.dat", skiprows=1,
+                               names=['index', 'pore_1_index', 'pore_2_index', 'radius', 'shape_factor',
+                                      'total_length'], sep='\s+')
+        Throats2 = pd.read_csv(path + '/' + name + "_link2.dat",
+                               names=['index', 'pore_1_index', 'pore_2_index', 'conduit_lengths_pore1',
+                                      'conduit_lengths_pore2', 'length', 'volume', 'clay_volume'], sep='\s+')
 
         Throats = pd.concat((Throats1, Throats2.loc[:, np.isin(Throats2.columns, Throats1.columns) == False]), axis=1)
-        Pores1=pd.read_csv(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4),sep='\s+',names=['index', 'x', 'y', 'z', 'connection_number'])
-        Pores2=pd.read_csv(path + '/' + name + "_node2.dat",names=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'],sep='\s+')
+        Pores1 = pd.read_csv(path + '/' + name + '_node1.dat', skiprows=1, usecols=(0, 1, 2, 3, 4), sep='\s+',
+                             names=['index', 'x', 'y', 'z', 'connection_number'])
+        Pores2 = pd.read_csv(path + '/' + name + "_node2.dat",
+                             names=['index', 'volume', 'radius', 'shape_factor', 'clay_volume'], sep='\s+')
         Pores = pd.concat((Pores1, Pores2.loc[:, np.isin(Pores2.columns, Pores1.columns) == False]), axis=1)
         '''
         Throats1 = np.loadtxt("test1D_link1.dat", skiprows=1)
@@ -82,13 +86,13 @@ class network(Base):
         throat_conns[throat_conns[:, 0] > throat_conns[:, 1]] = throat_conns[:, [1, 0]][
             throat_conns[:, 0] > throat_conns[:, 1]]  # make throat_conns first < second
 
-        pn['throat.conns']=throat_conns
+        pn['throat.conns'] = throat_conns
         pn['pore.inlets'] = ~np.copy(pn['pore.all'])
-        inlets_index=np.where(np.any(pn['throat.conns'] == -2,axis=1))[0]
-        pn['pore.inlets']=np.zeros_like(pn['pore.all'],dtype=bool)
-        pn['pore.inlets'][pn['throat.conns'][inlets_index, 1]]=True
-        outlets_index = np.where(np.any(pn['throat.conns'] == -1,axis=1))[0]
-        pn['pore.outlets']=np.zeros_like(pn['pore.all'],dtype=bool)
+        inlets_index = np.where(np.any(pn['throat.conns'] == -2, axis=1))[0]
+        pn['pore.inlets'] = np.zeros_like(pn['pore.all'], dtype=bool)
+        pn['pore.inlets'][pn['throat.conns'][inlets_index, 1]] = True
+        outlets_index = np.where(np.any(pn['throat.conns'] == -1, axis=1))[0]
+        pn['pore.outlets'] = np.zeros_like(pn['pore.all'], dtype=bool)
         pn['pore.outlets'][pn['throat.conns'][outlets_index, 1]] = True
         pn['throat.radius'] = Throats.loc[:, 'radius'].to_numpy()
         pn['throat.shape_factor'] = Throats.loc[:, 'shape_factor'].to_numpy()
@@ -121,10 +125,10 @@ class network(Base):
                              / (4.0 * pn['throat.shape_factor']))
         pn['pore.area'] = ((pn['pore.radius'] ** 2)
                            / (4.0 * pn['pore.shape_factor']))
-        pn['pore.solid']=np.zeros(nP,dtype=bool)
-        throats_trim=np.concatenate((inlets_index,outlets_index),axis=0)
+        pn['pore.solid'] = np.zeros(nP, dtype=bool)
         if remove_in_out_throats:
-            pn=tools.trim_pore(pn,throats=throats_trim)
+            throats_trim = np.concatenate((inlets_index, outlets_index), axis=0)
+            pn = tools.trim_pore(pn, throats=throats_trim, remove_iso_pore=False)
         return pn
 
     @staticmethod
@@ -227,10 +231,9 @@ class network(Base):
     #
     #         return all_data
 
-
     @staticmethod
-    def vtk2network(path,keep_label=False):
-        prefix=['throat.','pore.']
+    def vtk2network(path, keep_label=False):
+        prefix = ['throat.', 'pore.']
         dtype_map = {
             "int8": "Int8",
             "int16": "Int16",
@@ -244,39 +247,42 @@ class network(Base):
             "float64": "Float64",
             "str": "String",
         }
-        dtype_map={value:key for key,value in dtype_map.items()}
-
+        dtype_map = {value: key for key, value in dtype_map.items()}
 
         with open(path, 'r') as f:
-            string_=f.read()
-        root=ET.fromstring(string_)
-        pn={}
+            string_ = f.read()
+        root = ET.fromstring(string_)
+        pn = {}
 
-        Points_node=root.find('PolyData').find('Piece').find('Points')
+        Points_node = root.find('PolyData').find('Piece').find('Points')
         for Points in Points_node:
-            Points_text=Points.text
-            Points_attrib=Points.attrib
+            Points_text = Points.text
+            Points_attrib = Points.attrib
             if Points_attrib['Name'] == 'coords':
-                pn['pore.conns']=np.fromstring(Points_text,dtype=dtype_map[Points_attrib['type']],sep=' ').reshape((3,-1),order='F').T
-        Lines_node=root.find('PolyData').find('Piece').find('Lines')
+                pn['pore.conns'] = np.fromstring(Points_text, dtype=dtype_map[Points_attrib['type']], sep=' ').reshape(
+                    (3, -1), order='F').T
+        Lines_node = root.find('PolyData').find('Piece').find('Lines')
 
         for Lines in Lines_node:
-            Lines_text=Lines.text
-            Lines_attrib=Lines.attrib
-            if Lines_attrib['Name']=='connectivity':
-                pn['throat.conns']=np.fromstring(Lines_text,dtype=dtype_map[Lines_attrib['type']],sep=' ').reshape((-1,2))
+            Lines_text = Lines.text
+            Lines_attrib = Lines.attrib
+            if Lines_attrib['Name'] == 'connectivity':
+                pn['throat.conns'] = np.fromstring(Lines_text, dtype=dtype_map[Lines_attrib['type']], sep=' ').reshape(
+                    (-1, 2))
 
-        PointData_node=root.find('PolyData').find('Piece').find('PointData')
+        PointData_node = root.find('PolyData').find('Piece').find('PointData')
         for PointData in PointData_node:
-            PointData_text=PointData.text
-            PointData_attrib=PointData.attrib
-            pn[PointData_attrib['Name']]=np.fromstring(PointData_text,dtype=dtype_map[PointData_attrib['type']],sep=' ')
+            PointData_text = PointData.text
+            PointData_attrib = PointData.attrib
+            pn[PointData_attrib['Name']] = np.fromstring(PointData_text, dtype=dtype_map[PointData_attrib['type']],
+                                                         sep=' ')
 
-        CellData_node=root.find('PolyData').find('Piece').find('CellData')
+        CellData_node = root.find('PolyData').find('Piece').find('CellData')
         for CellData in CellData_node:
-            CellData_text=CellData.text
-            CellData_attrib=CellData.attrib
-            pn[CellData_attrib['Name']]=np.fromstring(CellData_text,dtype=dtype_map[CellData_attrib['type']],sep=' ')
+            CellData_text = CellData.text
+            CellData_attrib = CellData.attrib
+            pn[CellData_attrib['Name']] = np.fromstring(CellData_text, dtype=dtype_map[CellData_attrib['type']],
+                                                        sep=' ')
 
         for key in list(pn.keys()):
             if 'label' in key:
@@ -284,18 +290,18 @@ class network(Base):
                     pn[key] = pn[key].astype(bool)
                 else:
                     if any(prefix_ in key for prefix_ in prefix):
-                        start_index=-1
+                        start_index = -1
                         for prefix_ in prefix:
                             start_index_temp = key.find(prefix_)
-                            if start_index==-1 and start_index_temp==-1:
+                            if start_index == -1 and start_index_temp == -1:
                                 pass
-                            elif start_index==-1 and start_index_temp!=-1:
-                                start_index=start_index_temp
-                            elif start_index!=-1 and start_index_temp==-1:
+                            elif start_index == -1 and start_index_temp != -1:
+                                start_index = start_index_temp
+                            elif start_index != -1 and start_index_temp == -1:
                                 pass
                             else:
-                                if start_index_temp<start_index:
-                                    start_index=start_index_temp
+                                if start_index_temp < start_index:
+                                    start_index = start_index_temp
                         pn[key[start_index:]] = (pn.pop(key)).astype(bool)
 
             elif 'properties' in key:
@@ -303,26 +309,23 @@ class network(Base):
                     pass
                 else:
                     if any(prefix_ in key for prefix_ in prefix):
-                        start_index=-1
+                        start_index = -1
                         for prefix_ in prefix:
                             start_index_temp = key.find(prefix_)
-                            if start_index==-1 and start_index_temp==-1:
+                            if start_index == -1 and start_index_temp == -1:
                                 pass
-                            elif start_index==-1 and start_index_temp!=-1:
-                                start_index=start_index_temp
-                            elif start_index!=-1 and start_index_temp==-1:
+                            elif start_index == -1 and start_index_temp != -1:
+                                start_index = start_index_temp
+                            elif start_index != -1 and start_index_temp == -1:
                                 pass
                             else:
-                                if start_index_temp<start_index:
-                                    start_index=start_index_temp
+                                if start_index_temp < start_index:
+                                    start_index = start_index_temp
                         pn[key[start_index:]] = (pn.pop(key))
             else:
                 pass
 
         return pn
-
-
-
 
     @staticmethod
     def array_to_element(name, array, n=1):
@@ -378,7 +381,7 @@ class network(Base):
         # for key in d:
         #     if type(d[key]) is type(pn) and d[key] == pn:
         #         network_name = key
-        network_name=''
+        network_name = ''
         key_list = list(pn.keys())
 
         points = pn["pore.coords"]
@@ -443,5 +446,5 @@ class network(Base):
 if __name__ == '__main__':
     path = '../sample_data/Sphere_stacking_500_500_2000_60/pore_network'
     network().read_network(path=path, name='sphere_stacking_500_500_2000_60')
-    pn=network.vtk2network(path='../Samples/single_phase_flow/single_phase_permeability.vtp')
+    pn = network.vtk2network(path='../Samples/single_phase_flow/single_phase_permeability.vtp')
     print(pn.keys())
