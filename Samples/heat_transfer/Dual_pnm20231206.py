@@ -58,7 +58,7 @@ sample_data_root = '../../sample_data/Sphere_stacking_250_500_2800_20/'
 path = sample_data_root + 'pore_network'
 # project = op.io.Statoil.load(path=path, prefix='sphere_stacking_250_500_2800_20')
 
-project = net.read_network(path=path, name='sphere_stacking_250_500_2800_20',remove_in_out_throats=True)
+project = net.read_network(path=path, name='sphere_stacking_250_500_2800_20', remove_in_out_throats=True)
 pn_o = project
 # pn_o.name = 'pore'
 # pn['pore._id']=np.arange(len(pn['pore._id']))
@@ -463,7 +463,7 @@ for n in np.arange(len(re_s)):
                 P_profile_tem = algorithm().stead_stay_alg(pn, fluid, coe_A_P, Boundary_condition_P, resolution, False)
                 P_profile_tem = (P_profile_tem + P_profile_back) / 2
                 delta_p = P_profile_tem[pn['throat.conns'][:, 1]] - P_profile_tem[pn['throat.conns'][:, 0]]
-                flux_Throat_profile = delta_p * coe_A_P+1.0e-12
+                flux_Throat_profile = delta_p * coe_A_P + 1.0e-12
 
             P_profile_tem = algorithm().stead_stay_alg(pn, fluid, coe_A_P, Boundary_condition_P, resolution, False)
             P_profile[dualn['pore.void']] = P_profile_tem
@@ -489,12 +489,12 @@ for n in np.arange(len(re_s)):
 
             # ---------------'''temperature process '''---------------#
 
-            flux_Throat_profile = delta_p * coe_A_P+1.0e-12
+            flux_Throat_profile = delta_p * coe_A_P + 1.0e-12
             Vel_Throat_profile = flux_Throat_profile / pn['throat.radius'] ** 2 / 4 / pn['throat.real_shape_factor']
             RE_th = Vel_Throat_profile * pn['throat.radius'] * 2 * fluid['density'] / pn['throat.viscosity']
             # flux_Pore_profile=[cal_pore_veloc(pn,fluid,coe_A,P_profile,a) for a in pn['pore._id']]
             Vel_Pore_profile = topotools().cal_pore_veloc(pn, fluid, coe_A_P, P_profile[dualn['pore.void']],
-                                                          pn['pore._id'])
+                                                          pn['pore._id']) / 2
             RE_po = Vel_Pore_profile * pn['pore.radius'] * 2 * fluid['density'] / pn['pore.viscosity']
             # P_profile_o=np.copy(P_profile)
             RE_po_o = np.copy(RE_po)
@@ -665,7 +665,7 @@ for n in np.arange(len(re_s)):
         B = coo_matrix(
             (coe_B / dualn['throat.radius'] ** 2 / np.pi, (dualn['throat.conns'][:, 0], dualn['throat.conns'][:, 1])),
             shape=(num_node, num_node), dtype=np.float64).tolil()
-        A0 = (B.getH() + B).toarray()
+        A0 = (B.T + B).toarray()
         pore_h_coe = np.sum(A0, axis=0)
         # Phase['pore.h_coe'] = -pore_h_coe
 
