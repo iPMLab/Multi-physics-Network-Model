@@ -125,8 +125,8 @@ def cal_pore_veloc_nb(network_throat_area, network_pore_radius, network_pore_rea
             momentum = abs(abs(np.sum(momentum[momentum > 0])) - abs(np.sum(momentum[momentum < 0])))
 
             vel_p_m = np.sqrt(
-                momentum / (network_pore_radius[pore_id] ** 2 / 4 / network_pore_real_shape_factor[pore_id]))
-            vel_p = flux / (network_pore_radius[pore_id] ** 2 / 4 / network_pore_real_shape_factor[pore_id])
+                momentum / (network_pore_radius[pore_id] ** 2 / 16 / network_pore_real_shape_factor[pore_id]))
+            # vel_p = flux / (network_pore_radius[pore_id] ** 2 / 4 / network_pore_real_shape_factor[pore_id])
 
             # result[i] = [abs(vel_p), abs(vel_p_m)][1]
             result[i] = abs(vel_p_m)
