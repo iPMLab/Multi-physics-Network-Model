@@ -14,6 +14,7 @@ import scipy.spatial as spt
 import numba as nb
 import os
 import numexpr as ne
+import math
 
 if 'update_inner_info' not in os.environ.keys():
     os.environ['update_inner_info'] = 'False'
@@ -51,22 +52,21 @@ def check_input(**kwarg):
 class topotools(Base):
 
     @staticmethod
-    def find_surface_KDTree(pn, status='x', imsize=0, resolution=0, label_1='left', label_2='right'):
+    def find_surface_KDTree(pn, status='x', imsize=0, resolution=0, label_1='left', label_2='right',
+                            workers=math.ceil(os.cpu_count() / 4)):
         # t1 = time.time()
-        workers = -1  # 使用所有线程
         k = 1  # 寻找的邻点数
         distance_factor = 1.2  # 深度
         distance_factor2 = 0  # 平面外移
-        id_coord = np.concatenate((np.array([pn['pore._id']]).T, pn['pore.coords'],
-                                   np.array([pn['pore.radius']]).T), axis=1)
+        id_coord = np.column_stack((pn['pore._id'], pn['pore.coords'], pn['pore.radius']))
         coords = id_coord[:, 1:4]
-        length_temp = np.percentile(np.sort(pn['throat.length']), 0.05)
-        length_min = length_temp / 4
-        # coords[:, 0] = (coords[:, 0] - np.min(coords[:, 0])) / (np.max(coords[:, 0]) - np.min(coords[:, 0]))
-        # coords[:, 1] = (coords[:, 1] - np.min(coords[:, 1])) / (np.max(coords[:, 1]) - np.min(coords[:, 1]))
-        # coords[:, 2] = (coords[:, 2] - np.min(coords[:, 2])) / (np.max(coords[:, 2]) - np.min(coords[:, 2]))
-        # kt = spt.KDTree(data=coords, leafsize=10)  # 用于快速查找的KDTree类
         ckt = spt.cKDTree(coords)  # 用C写的查找类，执行速度更快
+        min_distances, _ = ckt.query(coords, k=2, workers=workers)
+        min_distances = min_distances[:, 1]
+        min_distances = min_distances[min_distances > 0]
+        length_temp = np.percentile(min_distances, 1)
+        length_min = length_temp / 4
+
         x_min = np.min(coords[:, 0])
         x_max = np.max(coords[:, 0])
         y_min = np.min(coords[:, 1])
