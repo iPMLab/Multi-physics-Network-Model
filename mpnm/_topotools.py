@@ -62,8 +62,7 @@ class topotools(Base):
         coords = id_coord[:, 1:4]
         ckt = spt.cKDTree(coords)  # 用C写的查找类，执行速度更快
         min_distances, _ = ckt.query(coords, k=2, workers=workers)
-        min_distances = min_distances[:, 1]
-        min_distances = min_distances[min_distances > 0]
+        min_distances = min_distances[:, 1][min_distances[:, 1]>0]
         length_temp = np.percentile(min_distances, 1)
         length_min = length_temp / 4
 
@@ -90,10 +89,8 @@ class topotools(Base):
             m2 = m2.flatten()
             m3 = np.full((len(m1)), x_min - distance_factor2 * diff)
             m4 = np.full((len(m1)), x_max + distance_factor2 * diff)
-            # print('num_nodes', len(m1))
-
-            mesh1 = np.vstack((m3, m1, m2)).transpose()
-            mesh2 = np.vstack((m4, m1, m2)).transpose()
+            mesh1 = np.column_stack((m3, m1, m2))
+            mesh2 = np.column_stack((m4, m1, m2))
             distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
             index1 = index1.flatten()
             distance1 = distance1.flatten()
@@ -103,16 +100,16 @@ class topotools(Base):
             distance2 = distance2.flatten()
             index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
 
-            pore_number1 = np.full((id_coord.shape[0]), 0)
-            pore_number2 = np.full((id_coord.shape[0]), 0)
+            pore_number1 = np.zeros((id_coord.shape[0]),dtype=bool)
+            pore_number2 = np.zeros((id_coord.shape[0]),dtype=bool)
             name_label1 = 'pore.' + label_1
             name_label2 = 'pore.' + label_2
-            pore_number1[index1] = 1
+            pore_number1[index1] = True
             pn[name_label1] = pore_number1
-            pore_number2[index2] = 1
+            pore_number2[index2] = True
             pn[name_label2] = pore_number2
-            pn[name_label1], pn[name_label2] = pn[name_label1].astype(bool), pn[name_label2].astype(
-                bool)
+            pn[name_label1], pn[name_label2] = pn[name_label1], pn[name_label2]
+
         if status == 'y':
             diff = y_max - y_min
             m1 = np.linspace(x_min, x_max, x_block)
@@ -122,10 +119,9 @@ class topotools(Base):
             m2 = m2.flatten()
             m3 = np.full((len(m1)), y_min - distance_factor2 * diff)
             m4 = np.full((len(m1)), y_max + distance_factor2 * diff)
-            # print('num_nodes', len(m1))
 
-            mesh1 = np.vstack((m1, m3, m2)).transpose()
-            mesh2 = np.vstack((m1, m4, m2)).transpose()
+            mesh1 = np.column_stack((m1, m3, m2))
+            mesh2 = np.column_stack((m1, m4, m2))
             distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
             index1 = index1.flatten()
             distance1 = distance1.flatten()
@@ -135,16 +131,16 @@ class topotools(Base):
             distance2 = distance2.flatten()
             index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
 
-            pore_number1 = np.full((id_coord.shape[0]), 0)
-            pore_number2 = np.full((id_coord.shape[0]), 0)
+            pore_number1 = np.zeros((id_coord.shape[0]),dtype=bool)
+            pore_number2 = np.zeros((id_coord.shape[0]),dtype=bool)
             name_label1 = 'pore.' + label_1
             name_label2 = 'pore.' + label_2
-            pore_number1[index1] = 1
+            pore_number1[index1] = True
             pn[name_label1] = pore_number1
-            pore_number2[index2] = 1
+            pore_number2[index2] = True
             pn[name_label2] = pore_number2
-            pn[name_label1], pn[name_label2] = pn[name_label1].astype(bool), pn[name_label2].astype(
-                bool)
+            pn[name_label1], pn[name_label2] = pn[name_label1], pn[name_label2]
+
 
         if status == 'z':
             diff = z_max - z_min
@@ -155,10 +151,8 @@ class topotools(Base):
             m2 = m2.flatten()
             m3 = np.full((len(m1)), z_min - distance_factor2 * diff)
             m4 = np.full((len(m1)), z_max + distance_factor2 * diff)
-            # print('num_nodes', len(m1))
-
-            mesh1 = np.vstack((m1, m2, m3)).transpose()
-            mesh2 = np.vstack((m1, m2, m4)).transpose()
+            mesh1 = np.column_stack((m1, m2, m3))
+            mesh2 = np.column_stack((m1, m2, m4))
             distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
             index1 = index1.flatten()
             distance1 = distance1.flatten()
@@ -168,16 +162,15 @@ class topotools(Base):
             distance2 = distance2.flatten()
             index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
 
-            pore_number1 = np.full((id_coord.shape[0]), 0)
-            pore_number2 = np.full((id_coord.shape[0]), 0)
+            pore_number1 = np.zeros((id_coord.shape[0]),dtype=bool)
+            pore_number2 = np.zeros((id_coord.shape[0]),dtype=bool)
             name_label1 = 'pore.' + label_1
             name_label2 = 'pore.' + label_2
-            pore_number1[index1] = 1
+            pore_number1[index1] = True
             pn[name_label1] = pore_number1
-            pore_number2[index2] = 1
+            pore_number2[index2] = True
             pn[name_label2] = pore_number2
-            pn[name_label1], pn[name_label2] = pn[name_label1].astype(bool), pn[name_label2].astype(
-                bool)
+            pn[name_label1], pn[name_label2] = pn[name_label1], pn[name_label2]
 
     # @staticmethod
     # def find_surface(pn, status, imsize, resolution, label_1='surface', label_2='surface', start=0.2,
