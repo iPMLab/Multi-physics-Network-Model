@@ -64,7 +64,7 @@ class topotools(Base):
         min_distances, _ = ckt.query(coords, k=2, workers=workers)
         min_distances = min_distances[:, 1][min_distances[:, 1]>0]
         length_temp = np.percentile(min_distances, 1)
-        length_min = length_temp / 4
+        length_min = length_temp
 
         x_min = np.min(coords[:, 0])
         x_max = np.max(coords[:, 0])
