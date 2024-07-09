@@ -259,7 +259,7 @@ class network(Base):
             Points_text = Points.text
             Points_attrib = Points.attrib
             if Points_attrib['Name'] == 'coords':
-                pn['pore.conns'] = np.fromstring(Points_text, dtype=dtype_map[Points_attrib['type']], sep=' ').reshape(
+                pn['pore.coords'] = np.fromstring(Points_text, dtype=dtype_map[Points_attrib['type']], sep=' ').reshape(
                     (3, -1), order='F').T
         Lines_node = root.find('PolyData').find('Piece').find('Lines')
 
