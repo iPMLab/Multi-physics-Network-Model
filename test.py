@@ -12,5 +12,9 @@ from scipy.spatial import KDTree
 
 import numpy as np
 a = np.array([[100, 10, 11], [3, 2, 12]])
+b=a.ravel()
+b[0]=-1
+print(a[np.unravel_index(5, a.shape)])
 print(a)
-print(np.percentile(a,1))
+
+
