@@ -11,10 +11,9 @@ from scipy.spatial import KDTree
 
 
 import numpy as np
-a = np.array([[100, 10, 11], [3, 2, 12]])
-b=a.ravel()
-b[0]=-1
-print(a[np.unravel_index(5, a.shape)])
-print(a)
+index=np.array([[1,2,3],[4,5,6]])
+value=np.array([[7,8,9],[10,11,12]])
+print(np.column_stack((index.flatten(), value.flatten())))
 
-
+print(np.where(index.flatten()==1))
+print(type(index))

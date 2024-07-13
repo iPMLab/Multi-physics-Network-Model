@@ -62,7 +62,7 @@ class topotools(Base):
         coords = id_coord[:, 1:4]
         ckt = spt.cKDTree(coords)  # 用C写的查找类，执行速度更快
         min_distances, _ = ckt.query(coords, k=2, workers=workers)
-        min_distances = min_distances[:, 1][min_distances[:, 1]>0]
+        min_distances = min_distances[:, 1][min_distances[:, 1] > 0]
         length_temp = np.percentile(min_distances, 1)
         length_min = length_temp
 
@@ -85,23 +85,23 @@ class topotools(Base):
             m1 = np.linspace(y_min, y_max, y_block)
             m2 = np.linspace(z_min, z_max, z_block)
             m1, m2 = np.meshgrid(m1, m2)
-            m1 = m1.flatten()
-            m2 = m2.flatten()
+            m1 = m1.ravel()
+            m2 = m2.ravel()
             m3 = np.full((len(m1)), x_min - distance_factor2 * diff)
             m4 = np.full((len(m1)), x_max + distance_factor2 * diff)
             mesh1 = np.column_stack((m3, m1, m2))
             mesh2 = np.column_stack((m4, m1, m2))
             distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
-            index1 = index1.flatten()
-            distance1 = distance1.flatten()
+            index1 = index1.ravel()
+            distance1 = distance1.ravel()
             index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
             distance2, index2 = ckt.query(mesh2, workers=workers, k=k)
-            index2 = index2.flatten()
-            distance2 = distance2.flatten()
+            index2 = index2.ravel()
+            distance2 = distance2.ravel()
             index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
 
-            pore_number1 = np.zeros((id_coord.shape[0]),dtype=bool)
-            pore_number2 = np.zeros((id_coord.shape[0]),dtype=bool)
+            pore_number1 = np.zeros((id_coord.shape[0]), dtype=bool)
+            pore_number2 = np.zeros((id_coord.shape[0]), dtype=bool)
             name_label1 = 'pore.' + label_1
             name_label2 = 'pore.' + label_2
             pore_number1[index1] = True
@@ -115,24 +115,24 @@ class topotools(Base):
             m1 = np.linspace(x_min, x_max, x_block)
             m2 = np.linspace(z_min, z_max, z_block)
             m1, m2 = np.meshgrid(m1, m2)
-            m1 = m1.flatten()
-            m2 = m2.flatten()
+            m1 = m1.ravel()
+            m2 = m2.ravel()
             m3 = np.full((len(m1)), y_min - distance_factor2 * diff)
             m4 = np.full((len(m1)), y_max + distance_factor2 * diff)
 
             mesh1 = np.column_stack((m1, m3, m2))
             mesh2 = np.column_stack((m1, m4, m2))
             distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
-            index1 = index1.flatten()
-            distance1 = distance1.flatten()
+            index1 = index1.ravel()
+            distance1 = distance1.ravel()
             index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
             distance2, index2 = ckt.query(mesh2, workers=workers, k=k)
-            index2 = index2.flatten()
-            distance2 = distance2.flatten()
+            index2 = index2.ravel()
+            distance2 = distance2.ravel()
             index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
 
-            pore_number1 = np.zeros((id_coord.shape[0]),dtype=bool)
-            pore_number2 = np.zeros((id_coord.shape[0]),dtype=bool)
+            pore_number1 = np.zeros((id_coord.shape[0]), dtype=bool)
+            pore_number2 = np.zeros((id_coord.shape[0]), dtype=bool)
             name_label1 = 'pore.' + label_1
             name_label2 = 'pore.' + label_2
             pore_number1[index1] = True
@@ -141,29 +141,28 @@ class topotools(Base):
             pn[name_label2] = pore_number2
             pn[name_label1], pn[name_label2] = pn[name_label1], pn[name_label2]
 
-
         if status == 'z':
             diff = z_max - z_min
             m1 = np.linspace(x_min, x_max, x_block)
             m2 = np.linspace(y_min, y_max, y_block)
             m1, m2 = np.meshgrid(m1, m2)
-            m1 = m1.flatten()
-            m2 = m2.flatten()
+            m1 = m1.ravel()
+            m2 = m2.ravel()
             m3 = np.full((len(m1)), z_min - distance_factor2 * diff)
             m4 = np.full((len(m1)), z_max + distance_factor2 * diff)
             mesh1 = np.column_stack((m1, m2, m3))
             mesh2 = np.column_stack((m1, m2, m4))
             distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
-            index1 = index1.flatten()
-            distance1 = distance1.flatten()
+            index1 = index1.ravel()
+            distance1 = distance1.ravel()
             index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
             distance2, index2 = ckt.query(mesh2, workers=workers, k=k)
-            index2 = index2.flatten()
-            distance2 = distance2.flatten()
+            index2 = index2.ravel()
+            distance2 = distance2.ravel()
             index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
 
-            pore_number1 = np.zeros((id_coord.shape[0]),dtype=bool)
-            pore_number2 = np.zeros((id_coord.shape[0]),dtype=bool)
+            pore_number1 = np.zeros((id_coord.shape[0]), dtype=bool)
+            pore_number2 = np.zeros((id_coord.shape[0]), dtype=bool)
             name_label1 = 'pore.' + label_1
             name_label2 = 'pore.' + label_2
             pore_number1[index1] = True
@@ -264,8 +263,8 @@ class topotools(Base):
             list_temp = []
             for j in id_small2big[i]:
 
-                start = np.argwhere(pn['throat.conns'][:, 0] == j).flatten()
-                end = np.argwhere(pn['throat.conns'][:, 1] == j).flatten()
+                start = np.where(pn['throat.conns'][:, 0] == j)[0]
+                end = np.where(pn['throat.conns'][:, 1] == j)[0]
 
                 cos_vector_angle = np.array([])
                 if start.shape != (0,):
@@ -295,25 +294,25 @@ class topotools(Base):
                         (id_coord[j, 2] - id_coord[external_id, 2]) ** 2 + (
                                 id_coord[j, 3] - id_coord[external_id, 3]) ** 2) < coverage * (
                                                         id_coord[j, 4] + id_coord[
-                                                    external_id, 4])).flatten()  # 在external列表中所有重叠的id的index
+                                                    external_id, 4])).ravel()  # 在external列表中所有重叠的id的index
                 elif status == 'y':
                     index_overlap = np.argwhere(np.sqrt(
                         (id_coord[j, 1] - id_coord[external_id, 1]) ** 2 + (
                                 id_coord[j, 3] - id_coord[external_id, 3]) ** 2) < coverage * (
                                                         id_coord[j, 4] + id_coord[
-                                                    external_id, 4])).flatten()  # 在external列表中所有重叠的id的index
+                                                    external_id, 4])).ravel()  # 在external列表中所有重叠的id的index
                 elif status == 'z':
                     index_overlap = np.argwhere(np.sqrt(
                         (id_coord[j, 2] - id_coord[external_id, 2]) ** 2 + (
                                 id_coord[j, 1] - id_coord[external_id, 1]) ** 2) < coverage * (
                                                         id_coord[j, 4] + id_coord[
-                                                    external_id, 4])).flatten()  # 在external列表中所有重叠的id的index
+                                                    external_id, 4])).ravel()  # 在external列表中所有重叠的id的index
                 else:
                     index_overlap = np.argwhere(np.sqrt(
                         (id_coord[j, 2] - id_coord[external_id, 2]) ** 2 + (
                                 id_coord[j, 3] - id_coord[external_id, 3]) ** 2) < coverage * (
                                                         id_coord[j, 4] + id_coord[
-                                                    external_id, 4])).flatten()  # 在external列表中所有重叠的id的index
+                                                    external_id, 4])).ravel()  # 在external列表中所有重叠的id的index
                 external_id = np.append(external_id, j)
                 if index_overlap.shape != (0,):
                     overlap = np.append(j, external_id[index_overlap])
@@ -592,9 +591,9 @@ class topotools(Base):
 
     @staticmethod
     def find_throat(pn, ids):
-        ids = np.array(ids).flatten()[0]
-        ind1 = np.argwhere(pn['throat.conns'][:, 0] == ids)
-        ind2 = np.argwhere(pn['throat.conns'][:, 1] == ids)
+        ids = np.array(ids).ravel()[0]
+        ind1 = np.where(pn['throat.conns'][:, 0] == ids)[0]
+        ind2 = np.where(pn['throat.conns'][:, 1] == ids)[0]
         res = np.append(ind1, ind2)
         return res
 
@@ -604,7 +603,7 @@ class topotools(Base):
         num_pore = len(pn['pore._id'])
         A = coo_matrix((pn['throat._id'], (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
                        shape=(num_pore, num_pore), dtype=np.float64).tolil()
-        A = (A.getH() + A).tolil()
+        A = (A.T + A).tolil()
         throat_inf = np.sort(A[ids].toarray()[0])[1:]
         throat_inf = np.unique(throat_inf)
         node_inf = np.argwhere(A[ids].toarray()[0] != 0)
@@ -614,7 +613,10 @@ class topotools(Base):
 
     @staticmethod
     def find_neighbor_ball(pn, ids):
-        ids = np.array(ids).flatten()[0]
+        if type(ids) is np.ndarray:
+            ids = ids.ravel()[0]
+        else:
+            ids = np.array(ids).ravel()[0]
         res = {}
         res['total'] = topotools.find_throat(pn, ids)
         res['solid'] = []

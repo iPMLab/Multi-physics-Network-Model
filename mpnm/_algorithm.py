@@ -59,8 +59,8 @@ class algorithm(Base):
                     bound_cond = {}
                     index = np.argwhere(pn[n] == True)
                     value = condctivity[index]
-                    bound_cond['throat_inlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
-                    bound_cond['throat_outlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
+                    bound_cond['throat_inlet_cond'] = np.column_stack((index.ravel(), value.ravel()))
+                    bound_cond['throat_outlet_cond'] = np.column_stack((index.ravel(), value.ravel()))
                     throat_inlet_cond = bound_cond['throat_inlet_cond']
 
                     throat_outlet_cond = bound_cond['throat_outlet_cond']
@@ -126,8 +126,8 @@ class algorithm(Base):
                     bound_cond = {}
                     index = np.argwhere(pn[n] == True)
                     value = condctivity[index]
-                    bound_cond['throat_inlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
-                    bound_cond['throat_outlet_cond'] = np.stack([index.flatten(), value.flatten()]).T
+                    bound_cond['throat_inlet_cond'] = np.column_stack((index.ravel(), value.ravel()))
+                    bound_cond['throat_outlet_cond'] = np.column_stack((index.ravel(), value.ravel()))
                     throat_inlet_cond = bound_cond['throat_inlet_cond']
                     throat_outlet_cond = bound_cond['throat_outlet_cond']
                     bound_cond = False
