@@ -13,7 +13,4 @@ from scipy.spatial import KDTree
 import numpy as np
 index=np.array([[1,2,3],[4,5,6]])
 value=np.array([[7,8,9],[10,11,12]])
-print(np.column_stack((index.flatten(), value.flatten())))
-
-print(np.where(index.flatten()==1))
-print(type(index))
+print(index.dtype)
