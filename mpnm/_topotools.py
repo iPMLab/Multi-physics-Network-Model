@@ -52,9 +52,17 @@ def check_input(**kwarg):
 class topotools(Base):
 
     @staticmethod
-    def find_surface_KDTree(pn, status='x', imsize=0, resolution=0, label_1='left', label_2='right',
-                            workers=math.ceil(os.cpu_count() / 4)):
+    def find_surface_KDTree(pn, status='x', imsize=0, resolution=0, label_1='left_surface', label_2='right_surface',
+                            workers=math.ceil(os.cpu_count() / 4),inplace = True):
         # t1 = time.time()
+        if inplace:
+            pass
+        else:
+            pn = copy.deepcopy(pn)
+        if type(status) == list or type(status) == tuple:
+            for i in range(len(status)):
+                topotools.find_surface_KDTree(pn, status[i], imsize, resolution, label_1[i], label_2[i], workers)
+            return pn
         k = 1  # 寻找的邻点数
         distance_factor = 1.2  # 深度
         distance_factor2 = 0  # 平面外移
@@ -63,113 +71,43 @@ class topotools(Base):
         ckt = spt.cKDTree(coords)  # 用C写的查找类，执行速度更快
         min_distances, _ = ckt.query(coords, k=2, workers=workers)
         min_distances = min_distances[:, 1][min_distances[:, 1] > 0]
-        length_temp = np.percentile(min_distances, 1)
+        length_temp = np.percentile(min_distances, 1.)
         length_min = length_temp
 
-        x_min = np.min(coords[:, 0])
-        x_max = np.max(coords[:, 0])
-        y_min = np.min(coords[:, 1])
-        y_max = np.max(coords[:, 1])
-        z_min = np.min(coords[:, 2])
-        z_max = np.max(coords[:, 2])
+        axis_min = np.min(coords, axis=0)
+        axis_max = np.max(coords, axis=0)
 
-        x_block = int(np.ceil((x_max - x_min) / length_min))
-        y_block = int(np.ceil((y_max - y_min) / length_min))
-        z_block = int(np.ceil((z_max - z_min) / length_min))
-        # x_block=1000
-        # y_block=1000
-        # z_block=1000
+        axis_block_num = np.ceil((axis_max - axis_min) / length_min).astype(int)
 
-        if status == 'x':
-            diff = x_max - x_min
-            m1 = np.linspace(y_min, y_max, y_block)
-            m2 = np.linspace(z_min, z_max, z_block)
-            m1, m2 = np.meshgrid(m1, m2)
-            m1 = m1.ravel()
-            m2 = m2.ravel()
-            m3 = np.full((len(m1)), x_min - distance_factor2 * diff)
-            m4 = np.full((len(m1)), x_max + distance_factor2 * diff)
-            mesh1 = np.column_stack((m3, m1, m2))
-            mesh2 = np.column_stack((m4, m1, m2))
-            distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
-            index1 = index1.ravel()
-            distance1 = distance1.ravel()
-            index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
-            distance2, index2 = ckt.query(mesh2, workers=workers, k=k)
-            index2 = index2.ravel()
-            distance2 = distance2.ravel()
-            index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
-
-            pore_number1 = np.zeros((id_coord.shape[0]), dtype=bool)
-            pore_number2 = np.zeros((id_coord.shape[0]), dtype=bool)
-            name_label1 = 'pore.' + label_1
-            name_label2 = 'pore.' + label_2
-            pore_number1[index1] = True
-            pn[name_label1] = pore_number1
-            pore_number2[index2] = True
-            pn[name_label2] = pore_number2
-            pn[name_label1], pn[name_label2] = pn[name_label1], pn[name_label2]
-
-        if status == 'y':
-            diff = y_max - y_min
-            m1 = np.linspace(x_min, x_max, x_block)
-            m2 = np.linspace(z_min, z_max, z_block)
-            m1, m2 = np.meshgrid(m1, m2)
-            m1 = m1.ravel()
-            m2 = m2.ravel()
-            m3 = np.full((len(m1)), y_min - distance_factor2 * diff)
-            m4 = np.full((len(m1)), y_max + distance_factor2 * diff)
-
-            mesh1 = np.column_stack((m1, m3, m2))
-            mesh2 = np.column_stack((m1, m4, m2))
-            distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
-            index1 = index1.ravel()
-            distance1 = distance1.ravel()
-            index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
-            distance2, index2 = ckt.query(mesh2, workers=workers, k=k)
-            index2 = index2.ravel()
-            distance2 = distance2.ravel()
-            index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
-
-            pore_number1 = np.zeros((id_coord.shape[0]), dtype=bool)
-            pore_number2 = np.zeros((id_coord.shape[0]), dtype=bool)
-            name_label1 = 'pore.' + label_1
-            name_label2 = 'pore.' + label_2
-            pore_number1[index1] = True
-            pn[name_label1] = pore_number1
-            pore_number2[index2] = True
-            pn[name_label2] = pore_number2
-            pn[name_label1], pn[name_label2] = pn[name_label1], pn[name_label2]
-
-        if status == 'z':
-            diff = z_max - z_min
-            m1 = np.linspace(x_min, x_max, x_block)
-            m2 = np.linspace(y_min, y_max, y_block)
-            m1, m2 = np.meshgrid(m1, m2)
-            m1 = m1.ravel()
-            m2 = m2.ravel()
-            m3 = np.full((len(m1)), z_min - distance_factor2 * diff)
-            m4 = np.full((len(m1)), z_max + distance_factor2 * diff)
-            mesh1 = np.column_stack((m1, m2, m3))
-            mesh2 = np.column_stack((m1, m2, m4))
-            distance1, index1 = ckt.query(mesh1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
-            index1 = index1.ravel()
-            distance1 = distance1.ravel()
-            index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
-            distance2, index2 = ckt.query(mesh2, workers=workers, k=k)
-            index2 = index2.ravel()
-            distance2 = distance2.ravel()
-            index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
-
-            pore_number1 = np.zeros((id_coord.shape[0]), dtype=bool)
-            pore_number2 = np.zeros((id_coord.shape[0]), dtype=bool)
-            name_label1 = 'pore.' + label_1
-            name_label2 = 'pore.' + label_2
-            pore_number1[index1] = True
-            pn[name_label1] = pore_number1
-            pore_number2[index2] = True
-            pn[name_label2] = pore_number2
-            pn[name_label1], pn[name_label2] = pn[name_label1], pn[name_label2]
+        axis_dict={'x':0,'y':1,'z':2}
+        axis_use=axis_dict.pop(status)
+        others_list=[0,1,2]
+        others_list.remove(axis_use)
+        axis_length = axis_max[axis_use] - axis_min[axis_use]
+        side_0 = np.linspace(axis_min[others_list[0]], axis_max[others_list[0]], axis_block_num[others_list[0]])
+        side_1 = np.linspace(axis_min[others_list[1]], axis_max[others_list[1]], axis_block_num[others_list[1]])
+        side_0, side_1 = np.meshgrid(side_0, side_1)
+        side_0 = side_0.ravel()
+        side_1 = side_1.ravel()
+        side_2 = np.full((len(side_0)), axis_min[axis_use] - distance_factor2 * axis_length)
+        side_3 = np.full((len(side_0)), axis_max[axis_use] + distance_factor2 * axis_length)
+        mesh_1=np.column_stack((side_0, side_1, side_2))[:,(others_list[0],others_list[1],axis_use)]
+        mesh_2=np.column_stack((side_0, side_1, side_3))[:,(others_list[0],others_list[1],axis_use)]
+        distance1, index1 = ckt.query(mesh_1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
+        index1,distance1 = index1.ravel(),distance1.ravel()
+        index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
+        distance2, index2 = ckt.query(mesh_2, workers=workers, k=k)
+        index2,distance2 = index2.ravel(),distance2.ravel()
+        index2 = np.unique(index2[distance2 < distance_factor * np.mean(distance2)])
+        pore_number1 = np.zeros((id_coord.shape[0]), dtype=bool)
+        pore_number2 = np.zeros((id_coord.shape[0]), dtype=bool)
+        name_label1 = 'pore.' + label_1
+        name_label2 = 'pore.' + label_2
+        pore_number1[index1] = True
+        pn[name_label1] = pore_number1
+        pore_number2[index2] = True
+        pn[name_label2] = pore_number2
+        return pn
 
     # @staticmethod
     # def find_surface(pn, status, imsize, resolution, label_1='surface', label_2='surface', start=0.2,

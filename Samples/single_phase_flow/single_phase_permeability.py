@@ -90,4 +90,6 @@ print('Absolute permeability', abs_perm)
 print('inlet velocity', output['pore.inlets'] / (imsize[1] * imsize[2] * resolution ** 2))
 t1 = time.time()
 print('using time', t1 - t0, 's')
+topotools().find_surface_KDTree(pn, ('x','y','z'), imsize, resolution, label_1=('left_surface','bottom_surface','back_surface'), label_2=('right_surface','top_surface','front_surface'))
 network.network2vtk(pn, 'single_phase_permeability')
+
