@@ -1,7 +1,16 @@
-import random
+import fastremap
+import numpy as np
+from scipy.spatial import KDTree
 
-a = [x for x in range(5)]
-b = [x for x in range(5)]
+# a=np.random.randn(200000,2)
+#
+# tree=KDTree(a)
+# distances,indice=tree.query(a,k=2)
+# print(distances[:,1])
 
-# random.shuffle(a)
-print(a[3,4,2,1,0])
+
+
+import numpy as np
+index=np.array([[1,2,3],[4,5,6]])
+value=np.array([[7,8,9],[10,11,12]])
+print(index.dtype)
