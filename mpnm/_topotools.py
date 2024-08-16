@@ -80,9 +80,18 @@ class topotools(Base):
         axis_block_num = np.ceil((axis_max - axis_min) / length_min).astype(int)
 
         axis_dict={'x':0,'y':1,'z':2}
+        if status == 'x':
+            sequence = (2,0,1)
+        elif status == 'y':
+            sequence = (0,2,1)
+        elif status == 'z':
+            sequence = (0,1,2)
+        else:
+            raise Exception('error status should be x,y,z')
         axis_use=axis_dict.pop(status)
         others_list=[0,1,2]
         others_list.remove(axis_use)
+        print(others_list)
         axis_length = axis_max[axis_use] - axis_min[axis_use]
         side_0 = np.linspace(axis_min[others_list[0]], axis_max[others_list[0]], axis_block_num[others_list[0]])
         side_1 = np.linspace(axis_min[others_list[1]], axis_max[others_list[1]], axis_block_num[others_list[1]])
@@ -91,8 +100,8 @@ class topotools(Base):
         side_1 = side_1.ravel()
         side_2 = np.full((len(side_0)), axis_min[axis_use] - distance_factor2 * axis_length)
         side_3 = np.full((len(side_0)), axis_max[axis_use] + distance_factor2 * axis_length)
-        mesh_1=np.column_stack((side_0, side_1, side_2))[:,(others_list[0],others_list[1],axis_use)]
-        mesh_2=np.column_stack((side_0, side_1, side_3))[:,(others_list[0],others_list[1],axis_use)]
+        mesh_1=np.column_stack((side_0, side_1, side_2))[:,sequence]
+        mesh_2=np.column_stack((side_0, side_1, side_3))[:,sequence]
         distance1, index1 = ckt.query(mesh_1, workers=workers, k=k)  # 返回最近邻点的距离d和在数组中的顺序x
         index1,distance1 = index1.ravel(),distance1.ravel()
         index1 = np.unique(index1[distance1 < distance_factor * np.mean(distance1)])
