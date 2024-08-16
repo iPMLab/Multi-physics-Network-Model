@@ -91,7 +91,6 @@ class topotools(Base):
         axis_use=axis_dict.pop(status)
         others_list=[0,1,2]
         others_list.remove(axis_use)
-        print(others_list)
         axis_length = axis_max[axis_use] - axis_min[axis_use]
         side_0 = np.linspace(axis_min[others_list[0]], axis_max[others_list[0]], axis_block_num[others_list[0]])
         side_1 = np.linspace(axis_min[others_list[1]], axis_max[others_list[1]], axis_block_num[others_list[1]])
