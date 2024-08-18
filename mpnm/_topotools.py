@@ -53,7 +53,7 @@ class topotools(Base):
 
     @staticmethod
     def find_surface_KDTree(pn, status='x', imsize=0, resolution=0, label_1='left_surface', label_2='right_surface',
-                            workers=math.ceil(os.cpu_count() / 4),inplace = True):
+                            workers=math.ceil(os.cpu_count() / 4),percentile=1.,inplace = True):
         # t1 = time.time()
         if inplace:
             pass
@@ -71,7 +71,7 @@ class topotools(Base):
         ckt = spt.cKDTree(coords)  # 用C写的查找类，执行速度更快
         min_distances, _ = ckt.query(coords, k=2, workers=workers)
         min_distances = min_distances[:, 1][min_distances[:, 1] > 0]
-        length_temp = np.percentile(min_distances, 1.)
+        length_temp = np.percentile(min_distances, percentile)
         length_min = length_temp
 
         axis_min = np.min(coords, axis=0)
