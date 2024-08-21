@@ -12,10 +12,11 @@ from scipy.sparse import coo_matrix
 from mpnm.tools_numba import *
 import scipy.spatial as spt
 import numba as nb
+import pandas as pd
 import os
 import numexpr as ne
 import math
-
+from typing import Union,List,Tuple
 if 'update_inner_info' not in os.environ.keys():
     os.environ['update_inner_info'] = 'False'
 
@@ -50,6 +51,64 @@ def check_input(**kwarg):
 
 
 class topotools(Base):
+    @staticmethod
+    def read_surface_area(pn,path:str,index_col=None,resolution:float = 1.,labels : Union[List,Tuple] = None,inplace:bool=True):
+        '''
+        according to right hand axis
+               Z
+               |
+               |
+               |
+               |
+               |
+               |
+               |________________ Y
+              /
+             /
+            /
+           /
+          /
+         /
+        X
+
+        '''
+        if labels is None:
+            labels = ('left_surface','right_surface','front_surface','back_surface','bottom_surface','top_surface')
+        if inplace:
+            pass
+        else:
+            pn = copy.deepcopy(pn)
+        axis_tuple=('x-','x+','y-','y+','z-','z+')
+        Boundaries_areas = pd.read_csv(path, index_col=index_col).to_numpy()
+        Boundaries_areas[:,0] = Boundaries_areas[:,0]-1
+
+
+        max_label = len(pn['pore.all'])-1
+
+        Boundaries_areas = Boundaries_areas[Boundaries_areas[:,0]<=max_label]
+        Boundaries_labels = Boundaries_areas[:,0]
+        colm_bools_list= []
+        colm_labels_list = []
+        colm_areas_list = []
+        pn_pore_which_surface_area_list = []
+        pn_pore_which_surface_list = []
+        for i in range(len(axis_tuple)):
+            index = i+1
+            colm_areas_list.append(Boundaries_areas[:, index])
+            colm_bools_list.append(colm_areas_list[i]>0)
+            colm_labels_list.append(Boundaries_labels[colm_bools_list[i]])
+
+            pn_pore_which_surface_area = np.zeros_like(pn['pore.all'],dtype=np.float32)
+            pn_pore_which_surface_area[colm_labels_list[i]] =colm_areas_list[i][colm_bools_list[i]]
+            pn_pore_which_surface_area_list.append(pn_pore_which_surface_area)
+
+            pn_pore_which_surface_list.append(pn_pore_which_surface_area_list[i].astype(bool))
+
+        for i in range(len(labels)):
+            pn['pore.' + labels[i]] = pn_pore_which_surface_list[i]
+            pn['pore.' + labels[i]+'_area'] = pn_pore_which_surface_area_list[i]*resolution**2
+
+        return pn
 
     @staticmethod
     def find_surface_KDTree(pn, status='x', imsize=0, resolution=0, label_1='left_surface', label_2='right_surface',
