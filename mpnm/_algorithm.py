@@ -13,9 +13,18 @@ import pypardiso as pp
 from mpnm._Base import *
 from mpnm._topotools import topotools as tool
 from mpnm._network import network as net
-
+from typing import Union,List,Tuple
 
 class algorithm(Base):
+    def __init__(self):
+        pass
+
+    # def conclude_boundary_conditions(self,Boundary_condition):
+    #     inlet_or_out_list = []
+    #     pore_or_solid_list = []
+    #
+    #     for keys,values in Boundary_condition:
+
     
     @staticmethod
     def stead_stay_alg_multi(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
@@ -96,7 +105,10 @@ class algorithm(Base):
         return Profile
     
     @staticmethod
-    def stead_stay_alg(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond=False):
+    def stead_stay_alg(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond=False,area_mode:str ="radius"):
+        '''
+        area mode choose the area calculation method
+        '''
         # num_pore = len(pn['pore.all'])
 
         num_pore=len(pn['pore.all'])
@@ -151,8 +163,9 @@ class algorithm(Base):
                                 throat_inlet_cond[:, 0].astype(int)]
                         elif Boundary_condition[m][n][1] == 'Neumann':
                             dig[throat_inlet_cond[:, 0].astype(int)] += 0
-                            b[throat_inlet_cond[:, 0].astype(int)] -= Boundary_condition[m][n][0] * \
-                                                                      pn['pore.radius'][pn[n]] ** 2 * np.pi
+                            which_surface = n.split('.')[1]
+                            area = np.pi * pn['pore.radius'][pn[n]] ** 2 if area_mode == "radius" else pn['pore.'+which_surface+'_area'][pn[n]]
+                            b[throat_inlet_cond[:, 0].astype(int)] -= Boundary_condition[m][n][0] * area
 
                     elif 'outlet' in m:
                         if Boundary_condition[m][n][1] == 'Dirichlet':
