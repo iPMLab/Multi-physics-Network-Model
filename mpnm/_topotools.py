@@ -34,15 +34,15 @@ class topotools(Base):
             else:
                 pass
             if 'inner_info' not in kwarg['pn']:
-                kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
+                kwarg['pn'].update(topotools.update_inner_info(kwarg['pn']))
             else:
                 pass
             if 'inner_start2end' not in kwarg['pn']:
-                kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
+                kwarg['pn'].update(topotools.update_inner_info(kwarg['pn']))
             else:
                 pass
             if os.environ['update_inner_info'] == 'True':
-                kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
+                kwarg['pn'].update(topotools.update_inner_info(kwarg['pn']))
             if 'ids' in kwarg:
                 if isinstance(kwarg['ids'], np.ndarray):
                     ids = kwarg['ids']
@@ -55,6 +55,13 @@ class topotools(Base):
                     raise Exception('index type error')
                 return ids
 
+    @classmethod
+    def is_inplace(cls,pn,inplace):
+        if inplace:
+            pass
+        else:
+            pn = copy.deepcopy(pn)
+        return pn
 
     @classmethod
     def read_surface_area(cls,pn,path:str,index_col=None,resolution:float = 1.,labels : Union[List,Tuple] = None,inplace:bool=True):
@@ -77,12 +84,9 @@ class topotools(Base):
         X
 
         '''
+        pn =  cls.is_inplace(pn,inplace)
         if labels is None:
             labels = ('left_surface','right_surface','front_surface','back_surface','bottom_surface','top_surface')
-        if inplace:
-            pass
-        else:
-            pn = copy.deepcopy(pn)
         axis_tuple=('x-','x+','y-','y+','z-','z+')
         Boundaries_areas = pd.read_csv(path, index_col=index_col).to_numpy()
         Boundaries_areas[:,0] = Boundaries_areas[:,0]-1
@@ -119,10 +123,9 @@ class topotools(Base):
     def find_surface_KDTree(cls,pn, status='x', imsize=0, resolution=0, label_1='left_surface', label_2='right_surface',
                             workers=math.ceil(os.cpu_count() / 4),percentile=1.,inplace = True):
         # t1 = time.time()
-        if inplace:
-            pass
-        else:
-            pn = copy.deepcopy(pn)
+        pn = cls.is_inplace(pn,inplace)
+        if 'pore.surface' not in pn.keys():
+            pn['pore.surface'] = np.zeros_like(pn['pore.all'], dtype=bool)
         if type(status) == list or type(status) == tuple:
             for i in range(len(status)):
                 topotools.find_surface_KDTree(pn, status[i], imsize, resolution, label_1[i], label_2[i], workers)
@@ -179,6 +182,7 @@ class topotools(Base):
         pn[name_label1] = pore_number1
         pore_number2[index2] = True
         pn[name_label2] = pore_number2
+        pn['pore.surface'][[*index1,*index2]] = True
         return pn
 
     # @classmethod
@@ -424,7 +428,8 @@ class topotools(Base):
     '''
 
     @classmethod
-    def trim_surface(cls,pn):
+    def trim_surface(cls,pn,inplace = True):
+        pn = cls.is_inplace(pn,inplace)
         for i in ['left', 'right']:
             for j in ['back', 'front']:
                 for k in ['bottom', 'top']:
@@ -513,6 +518,7 @@ class topotools(Base):
 
     @classmethod
     def trim_pore(cls,pn, pores=None, throats=None, remove_iso_pore=True, keep_inlets_outlets=False, inplace=False):
+        pn = cls.is_inplace(pn, inplace)
         if pores is None:
             pores = np.array([], dtype=int)
         if throats is None:
@@ -521,49 +527,45 @@ class topotools(Base):
             pores = np.array(pores)
         if not isinstance(throats, np.ndarray):
             throats = np.array(throats)
-        if inplace:
-            backup = pn
-        else:
-            backup = pn.copy()
-        throats_isolated = np.where(np.any(np.isin(backup['throat.conns'], pores), axis=1))[0]
+        throats_isolated = np.where(np.any(np.isin(pn['throat.conns'], pores), axis=1))[0]
         throats = np.append(throats, throats_isolated)
         for i in pn:
             if 'pore' in i and 'throat' not in i:
-                backup[i] = np.delete(backup[i], pores, axis=0)
+                pn[i] = np.delete(pn[i], pores, axis=0)
             if 'throat' in i:
-                backup[i] = np.delete(backup[i], throats, axis=0)
+                pn[i] = np.delete(pn[i], throats, axis=0)
 
         if remove_iso_pore:
-            pores_isolated = np.where(np.isin(backup['pore.label'], backup['throat.conns']) == False)[0]
+            pores_isolated = np.where(np.isin(pn['pore.label'], pn['throat.conns']) == False)[0]
             if len(pores_isolated) > 0:
                 print('Find isolated %d pore' % len(pores_isolated))
                 for i in pn:
                     if 'pore' in i and 'throat' not in i:
-                        backup[i] = np.delete(backup[i], pores_isolated, axis=0)
+                        pn[i] = np.delete(pn[i], pores_isolated, axis=0)
 
-        backup['pore._id'] = np.arange(len(backup['pore.all']))
-        backup['throat._id'] = np.arange(len(backup['throat.all']))
-        throat_internal_index = backup['throat._id'][(backup['throat.conns'][:, 0] >= 0)]
+        pn['pore._id'] = np.arange(len(pn['pore.all']))
+        pn['throat._id'] = np.arange(len(pn['throat.all']))
+        throat_internal_index = pn['throat._id'][(pn['throat.conns'][:, 0] >= 0)]
         '''
         https://stackoverflow.com/questions/13572448/replace-values-of-a-numpy-index-array-with-values-of-a-list
         pore.label is assumed sorted
         '''
-        backup['throat.conns'][:, 0][throat_internal_index] = np.digitize(
-            backup['throat.conns'][:, 0][throat_internal_index], backup['pore.label']) - 1
-        backup['throat.conns'][:, 1] = np.digitize(backup['throat.conns'][:, 1], backup['pore.label']) - 1
+        pn['throat.conns'][:, 0][throat_internal_index] = np.digitize(
+            pn['throat.conns'][:, 0][throat_internal_index], pn['pore.label']) - 1
+        pn['throat.conns'][:, 1] = np.digitize(pn['throat.conns'][:, 1], pn['pore.label']) - 1
 
         if keep_inlets_outlets:
             pass
         else:
-            backup['throat.conns'] = backup['throat.conns'][throat_internal_index]
+            pn['throat.conns'] = pn['throat.conns'][throat_internal_index]
             for i in pn:
                 if 'throat' in i and 'conns' not in i:
-                    backup[i] = backup[i][throat_internal_index]
+                    pn[i] = pn[i][throat_internal_index]
 
-        backup['throat._id'] = np.arange(len(backup['throat.all']))
-        backup['pore.label'] = np.arange(len(backup['pore.all']))
-        backup['throat.label'] = np.arange(len(backup['throat.all']))
-        return backup
+        pn['throat._id'] = np.arange(len(pn['throat.all']))
+        pn['pore.label'] = np.arange(len(pn['pore.all']))
+        pn['throat.label'] = np.arange(len(pn['throat.all']))
+        return pn
 
     @classmethod
     def trim_phase(cls,pn, pores, throat):
