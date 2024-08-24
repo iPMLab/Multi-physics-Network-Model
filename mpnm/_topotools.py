@@ -85,8 +85,8 @@ class topotools(Base):
 
         '''
         pn =  cls.is_inplace(pn,inplace)
-        if 'pore.surface' not in pn.keys():
-            pn['pore.surface'] = np.zeros_like(pn['pore.all'], dtype=bool)
+        if 'pore.all_surface' not in pn.keys():
+            pn['pore.all_surface'] = np.zeros_like(pn['pore.all'], dtype=bool)
         else:
             pass
         if labels is None:
@@ -119,7 +119,7 @@ class topotools(Base):
 
         for i in range(len(labels)):
             pn['pore.' + labels[i]] = pn_pore_which_surface_list[i]
-            pn['pore.surface'][colm_labels_list[i]] = True
+            pn['pore.all_surface'][colm_labels_list[i]] = True
             pn['pore.' + labels[i]+'_area'] = pn_pore_which_surface_area_list[i]*resolution**2
 
         return pn
@@ -129,8 +129,8 @@ class topotools(Base):
                             workers=math.ceil(os.cpu_count() / 4),percentile=1.,inplace = True):
         # t1 = time.time()
         pn = cls.is_inplace(pn,inplace)
-        if 'pore.surface' not in pn.keys():
-            pn['pore.surface'] = np.zeros_like(pn['pore.all'], dtype=bool)
+        if 'pore.all_surface' not in pn.keys():
+            pn['pore.all_surface'] = np.zeros_like(pn['pore.all'], dtype=bool)
         else:
             pass
         if type(status) == list or type(status) == tuple:
@@ -189,7 +189,7 @@ class topotools(Base):
         pn[name_label1] = pore_number1
         pore_number2[index2] = True
         pn[name_label2] = pore_number2
-        pn['pore.surface'][[*index1,*index2]] = True
+        pn['pore.all_surface'][[*index1,*index2]] = True
         return pn
 
     # @classmethod
