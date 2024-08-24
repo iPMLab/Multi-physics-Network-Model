@@ -85,6 +85,10 @@ class topotools(Base):
 
         '''
         pn =  cls.is_inplace(pn,inplace)
+        if 'pore.surface' not in pn.keys():
+            pn['pore.surface'] = np.zeros_like(pn['pore.all'], dtype=bool)
+        else:
+            pass
         if labels is None:
             labels = ('left_surface','right_surface','front_surface','back_surface','bottom_surface','top_surface')
         axis_tuple=('x-','x+','y-','y+','z-','z+')
@@ -96,11 +100,11 @@ class topotools(Base):
 
         Boundaries_areas = Boundaries_areas[Boundaries_areas[:,0]<=max_label]
         Boundaries_labels = Boundaries_areas[:,0]
-        colm_bools_list= []
-        colm_labels_list = []
-        colm_areas_list = []
-        pn_pore_which_surface_area_list = []
-        pn_pore_which_surface_list = []
+        colm_bools_list= [] # each column > 0
+        colm_labels_list = [] # each column labels
+        colm_areas_list = [] # each column areas
+        pn_pore_which_surface_area_list = [] # each pn[pore.which_surface_area]
+        pn_pore_which_surface_list = [] # each pn[pore.which_surface]
         for i in range(len(axis_tuple)):
             index = i+1
             colm_areas_list.append(Boundaries_areas[:, index])
@@ -115,6 +119,7 @@ class topotools(Base):
 
         for i in range(len(labels)):
             pn['pore.' + labels[i]] = pn_pore_which_surface_list[i]
+            pn['pore.surface'][colm_labels_list[i]] = True
             pn['pore.' + labels[i]+'_area'] = pn_pore_which_surface_area_list[i]*resolution**2
 
         return pn
