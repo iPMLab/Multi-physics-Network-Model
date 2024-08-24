@@ -126,6 +126,8 @@ class topotools(Base):
         pn = cls.is_inplace(pn,inplace)
         if 'pore.surface' not in pn.keys():
             pn['pore.surface'] = np.zeros_like(pn['pore.all'], dtype=bool)
+        else:
+            pass
         if type(status) == list or type(status) == tuple:
             for i in range(len(status)):
                 topotools.find_surface_KDTree(pn, status[i], imsize, resolution, label_1[i], label_2[i], workers)
