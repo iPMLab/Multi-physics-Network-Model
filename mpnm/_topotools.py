@@ -21,38 +21,43 @@ if 'update_inner_info' not in os.environ.keys():
     os.environ['update_inner_info'] = 'False'
 
 
-def check_input(**kwarg):
-    if 'pn' in kwarg:
-        if 'pore.solid' not in kwarg['pn']:
-            kwarg['pn']['pore.solid'] = np.zeros_like(kwarg['pn']['pore.void'])
-        else:
-            pass
-        if 'inner_info' not in kwarg['pn']:
-            kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
-        else:
-            pass
-        if 'inner_start2end' not in kwarg['pn']:
-            kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
-        else:
-            pass
-        if os.environ['update_inner_info'] == 'True':
-            kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
-        if 'ids' in kwarg:
-            if isinstance(kwarg['ids'], np.ndarray):
-                ids = kwarg['ids']
-            elif type(kwarg[
-                          'ids']) == int or float or np.int64 or np.int16 or np.int8 or np.float32 or np.float64 or np.float16 or np.float8:
-                ids = np.array([kwarg['ids']])
-            elif type(kwarg['ids']) == list:
-                ids = np.array(kwarg['ids'])
-            else:
-                raise Exception('index type error')
-            return ids
+
 
 
 class topotools(Base):
-    @staticmethod
-    def read_surface_area(pn,path:str,index_col=None,resolution:float = 1.,labels : Union[List,Tuple] = None,inplace:bool=True):
+
+    @classmethod
+    def check_input(cls,**kwarg):
+        if 'pn' in kwarg:
+            if 'pore.solid' not in kwarg['pn']:
+                kwarg['pn']['pore.solid'] = np.zeros_like(kwarg['pn']['pore.void'])
+            else:
+                pass
+            if 'inner_info' not in kwarg['pn']:
+                kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
+            else:
+                pass
+            if 'inner_start2end' not in kwarg['pn']:
+                kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
+            else:
+                pass
+            if os.environ['update_inner_info'] == 'True':
+                kwarg['pn'].update(topotools().update_inner_info(kwarg['pn']))
+            if 'ids' in kwarg:
+                if isinstance(kwarg['ids'], np.ndarray):
+                    ids = kwarg['ids']
+                elif type(kwarg[
+                              'ids']) == int or float or np.int64 or np.int16 or np.int8 or np.float32 or np.float64 or np.float16 or np.float8:
+                    ids = np.array([kwarg['ids']])
+                elif type(kwarg['ids']) == list:
+                    ids = np.array(kwarg['ids'])
+                else:
+                    raise Exception('index type error')
+                return ids
+
+
+    @classmethod
+    def read_surface_area(cls,pn,path:str,index_col=None,resolution:float = 1.,labels : Union[List,Tuple] = None,inplace:bool=True):
         '''
         according to right hand axis
                Z
@@ -110,8 +115,8 @@ class topotools(Base):
 
         return pn
 
-    @staticmethod
-    def find_surface_KDTree(pn, status='x', imsize=0, resolution=0, label_1='left_surface', label_2='right_surface',
+    @classmethod
+    def find_surface_KDTree(cls,pn, status='x', imsize=0, resolution=0, label_1='left_surface', label_2='right_surface',
                             workers=math.ceil(os.cpu_count() / 4),percentile=1.,inplace = True):
         # t1 = time.time()
         if inplace:
@@ -176,8 +181,8 @@ class topotools(Base):
         pn[name_label2] = pore_number2
         return pn
 
-    # @staticmethod
-    # def find_surface(pn, status, imsize, resolution, label_1='surface', label_2='surface', start=0.2,
+    # @classmethod
+    # def find_surface(cls, pn, status, imsize, resolution, label_1='surface', label_2='surface', start=0.2,
     #                  end=0.8):
     #     if status == 'x':
     #         size1 = int(imsize[1] / 100)
@@ -225,8 +230,8 @@ class topotools(Base):
     #     op.topotools.find_surface_pores(pn, markers_0, label=label_1)
     #     op.topotools.find_surface_pores(pn, markers_1, label=label_2)
 
-    @staticmethod
-    def find_surface_s(pn, status='x', imsize=0, resolution=0, label_1='left', label_2='right'):
+    @classmethod
+    def find_surface_s(cls,pn, status='x', imsize=0, resolution=0, label_1='left', label_2='right'):
         # label1对应小值，label2对应大值，所有变量也是这个顺序
         id_coord = np.concatenate((np.array([pn['pore._id']]).T, pn['pore.coords'],
                                    np.array([pn['pore.radius']]).T), axis=1)
@@ -418,8 +423,8 @@ class topotools(Base):
         op.topotools.find_surface_pores(pn,markers_1,label=label_2)    
     '''
 
-    @staticmethod
-    def trim_surface(pn):
+    @classmethod
+    def trim_surface(cls,pn):
         for i in ['left', 'right']:
             for j in ['back', 'front']:
                 for k in ['bottom', 'top']:
@@ -433,8 +438,8 @@ class topotools(Base):
                 pn['pore.' + i + '_surface'][back] = False
                 pn['pore.' + j + '_surface'][back] = False
 
-    @staticmethod
-    def devide_layer(pn, n, size, resolution):
+    @classmethod
+    def devide_layer(cls,pn, n, size, resolution):
         layer = {}
         # step=size*resulation/n
         layer[0] = {}  # left right
@@ -449,8 +454,8 @@ class topotools(Base):
                 layer[i][j][(pn['pore.coords'][:, i] - index) > (j + 1) * step] = False
         return layer
 
-    @staticmethod
-    def devide_layer_throat(pn, n, size, resolution):
+    @classmethod
+    def devide_layer_throat(cls,pn, n, size, resolution):
         layer = {}
         # step=size*resulation/n
         layer[0] = {}  # left right
@@ -465,8 +470,8 @@ class topotools(Base):
                 layer[i][j][(pn['throat.coords'][:, i] - index) > (j + 1) * step] = False
         return layer
 
-    @staticmethod
-    def pore_health(pn, connections=1, equal=False):
+    @classmethod
+    def pore_health(cls,pn, connections=1, equal=False):
         '''
         remove pores, which connections<1
         '''
@@ -484,8 +489,8 @@ class topotools(Base):
 
         return health
 
-    @staticmethod
-    def pore_health_s(pn):
+    @classmethod
+    def pore_health_s(cls,pn):
         number = len(pn['pore.all'])
         conns = np.copy(pn['throat.conns'])
         health = {}
@@ -506,8 +511,8 @@ class topotools(Base):
 
         return health
 
-    @staticmethod
-    def trim_pore(pn, pores=None, throats=None, remove_iso_pore=True, keep_inlets_outlets=False, inplace=False):
+    @classmethod
+    def trim_pore(cls,pn, pores=None, throats=None, remove_iso_pore=True, keep_inlets_outlets=False, inplace=False):
         if pores is None:
             pores = np.array([], dtype=int)
         if throats is None:
@@ -560,8 +565,8 @@ class topotools(Base):
         backup['throat.label'] = np.arange(len(backup['throat.all']))
         return backup
 
-    @staticmethod
-    def trim_phase(pn, pores, throat):
+    @classmethod
+    def trim_phase(cls,pn, pores, throat):
         # count=len(pn)
         backup = {}
         for i in pn:
@@ -576,8 +581,8 @@ class topotools(Base):
         backup['throat._id'] = np.arange(len(backup['throat.all']))
         return backup
 
-    @staticmethod
-    def find_if_surface(pn, index):
+    @classmethod
+    def find_if_surface(cls,pn, index):
         res = []
         for j in index:
             b = 0
@@ -587,23 +592,23 @@ class topotools(Base):
                     res.append(b)
         return res
 
-    @staticmethod
-    def find_whereis_pore(pn, parameter, index):
+    @classmethod
+    def find_whereis_pore(cls,pn, parameter, index):
         index1 = np.sort(parameter)[index]
         index2 = np.argwhere(parameter == index1)[0]
         index3 = topotools.find_if_surface(pn, index2)
         return [index1, index2, index3]
 
-    @staticmethod
-    def find_throat(pn, ids):
+    @classmethod
+    def find_throat(cls,pn, ids):
         ids = np.array(ids).ravel()[0]
         ind1 = np.where(pn['throat.conns'][:, 0] == ids)[0]
         ind2 = np.where(pn['throat.conns'][:, 1] == ids)[0]
         res = np.append(ind1, ind2)
         return res
 
-    @staticmethod
-    def find_neighbor_nodes(pn, ids):
+    @classmethod
+    def find_neighbor_nodes(cls,pn, ids):
 
         num_pore = len(pn['pore._id'])
         A = coo_matrix((pn['throat._id'], (pn['throat.conns'][:, 1], pn['throat.conns'][:, 0])),
@@ -616,8 +621,8 @@ class topotools(Base):
 
         return throat_inf, node_inf
 
-    @staticmethod
-    def find_neighbor_ball(pn, ids):
+    @classmethod
+    def find_neighbor_ball(cls,pn, ids):
         if type(ids) is np.ndarray:
             ids = ids.ravel()[0]
         else:
@@ -651,20 +656,20 @@ class topotools(Base):
         else:
             return 0
 
-    @staticmethod
-    def find_neighbor_ball_(pn, ids):
-        ids = check_input(pn=pn, ids=ids)
+    @classmethod
+    def find_neighbor_ball_(cls,pn, ids):
+        ids = cls.check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         return find_neighbor_ball_nb(network_pore_void, network_pore_solid, pn['throat.conns'], ids)
 
-    @staticmethod
-    def H_P_fun(r, l, vis):
+    @classmethod
+    def H_P_fun(cls,r, l, vis):
         g = np.pi * r ** 4 / 8 / vis / l
         return g
 
-    @staticmethod
-    def Mass_conductivity(pn):
+    @classmethod
+    def Mass_conductivity(cls,pn):
         g_ij = []
         cond = lambda r, G, k, v: (r ** 4) / 16 / G * k / v
         g_i = cond(pn['pore.radius'][pn['throat.conns'][:, 0]],
@@ -692,9 +697,9 @@ class topotools(Base):
         g_ij = (li + lj + lt) / (li / g_i + lj / g_j + lt / g_t)
         return g_ij
 
-    @staticmethod
+    @classmethod
     # this function the viscosity has not change
-    def Boundary_cond_cal(pn, throat_inlet1, throat_inlet2, fluid, newPore, Pores):
+    def Boundary_cond_cal(cls,pn, throat_inlet1, throat_inlet2, fluid, newPore, Pores):
         throat_inlet_cond = []
         BndG1 = (np.sqrt(3) / 36 + 0.00001)
         BndG2 = 0.07
@@ -719,9 +724,9 @@ class topotools(Base):
 
         return np.array(throat_inlet_cond)
 
-    @staticmethod
-    def species_balance_conv(pn, g_ij, Tem, thermal_con_dual, P_profile, ids):
-        ids = check_input(pn=pn, ids=ids)
+    @classmethod
+    def species_balance_conv(cls,pn, g_ij, Tem, thermal_con_dual, P_profile, ids):
+        ids = cls.check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -736,9 +741,9 @@ class topotools(Base):
         else:
             return result
 
-    @staticmethod
-    def calculate_species_flow(pn, Boundary_condition, g_ij, Tem_c, thermal_con_dual, P_profile, Num):
-        check_input(pn=pn)
+    @classmethod
+    def calculate_species_flow(cls,pn, Boundary_condition, g_ij, Tem_c, thermal_con_dual, P_profile, Num):
+        cls.check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -759,9 +764,9 @@ class topotools(Base):
         output.update({'total': np.sum(total)})
         return output
 
-    @staticmethod
-    def energy_balance_conv(pn, g_ij, Tem, thermal_con_dual, P_profile, ids):
-        ids = check_input(pn=pn, ids=ids)
+    @classmethod
+    def energy_balance_conv(cls,pn, g_ij, Tem, thermal_con_dual, P_profile, ids):
+        ids = cls.check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -777,9 +782,9 @@ class topotools(Base):
         else:
             return result
 
-    @staticmethod
-    def calculate_heat_flow(pn, Boundary_condition, g_ij, Tem_c, thermal_con_dual, P_profile, Num):
-        check_input(pn=pn)
+    @classmethod
+    def calculate_heat_flow(cls,pn, Boundary_condition, g_ij, Tem_c, thermal_con_dual, P_profile, Num):
+        cls.check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -800,9 +805,9 @@ class topotools(Base):
         output.update({'total': np.sum(total)})
         return output
 
-    @staticmethod
-    def mass_balance_conv(pn, g_ij, P_profile, ids):
-        ids = check_input(pn=pn, ids=ids)
+    @classmethod
+    def mass_balance_conv(cls,pn, g_ij, P_profile, ids):
+        ids = cls.check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -816,9 +821,9 @@ class topotools(Base):
         else:
             return result
 
-    @staticmethod
-    def mass_balance_conv_o(pn, g_ij, P_profile, ids):
-        ids = check_input(pn=pn, ids=ids)
+    @classmethod
+    def mass_balance_conv_o(cls,pn, g_ij, P_profile, ids):
+        ids = cls.check_input(pn=pn, ids=ids)
         # res=find_neighbor_ball(pn,[ids])
         res = topotools.find_neighbor_ball(pn, ids)
         if res == 0:
@@ -839,9 +844,9 @@ class topotools(Base):
         # print('h_conv_f=%f,h_cond_f=%f, h_cond_sf=%f,h_cond_s=%f'%(h_conv_f,h_cond_f, h_cond_sf,h_cond_s))
         return result
 
-    @staticmethod
-    def calculate_mass_flow(pn, Boundary_condition, g_ij, P_profile, Num):
-        check_input(pn=pn)
+    @classmethod
+    def calculate_mass_flow(cls,pn, Boundary_condition, g_ij, P_profile, Num):
+        cls.check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -860,9 +865,9 @@ class topotools(Base):
         output.update({'total': np.sum(total)})
         return output
 
-    @staticmethod
-    def cal_pore_veloc(pn, fluid, g_ij, P_profile, ids):
-        ids = check_input(pn=pn, ids=ids)
+    @classmethod
+    def cal_pore_veloc(cls,pn, fluid, g_ij, P_profile, ids):
+        ids = cls.check_input(pn=pn, ids=ids)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -877,9 +882,9 @@ class topotools(Base):
         else:
             return result
 
-    @staticmethod
-    def cal_pore_flux(pn, Boundary_condition, g_ij, P_profile, Num):
-        check_input(pn=pn)
+    @classmethod
+    def cal_pore_flux(cls,pn, Boundary_condition, g_ij, P_profile, Num):
+        cls.check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
         inner_info = pn['inner_info']
@@ -909,8 +914,8 @@ class topotools(Base):
         return pn
     '''
 
-    @staticmethod
-    def add_pores(pn1, pn2, trail=True):  # pn=pn1,pn2
+    @classmethod
+    def add_pores(cls,pn1, pn2, trail=True):  # pn=pn1,pn2
         num_p = len(pn1['pore.all'])
         num_t = len(pn1['throat.all'])
         pn2['throat._id'] += num_t
@@ -932,8 +937,8 @@ class topotools(Base):
         pn['pore.label'] = np.sort(pn['pore.label'])
         return pn
 
-    @staticmethod
-    def clone_pores(pn, pores, label='clone_p'):
+    @classmethod
+    def clone_pores(cls,pn, pores, label='clone_p'):
         clone = {}
         num = len(pn['pore.all'][pores])
         for i in pn:
@@ -953,8 +958,8 @@ class topotools(Base):
         clone[label] = np.ones(num).astype(bool)
         return clone
 
-    @staticmethod
-    def merge_clone_pore(pn, pores, radius, resolution, imsize, side, label='clone_p'):
+    @classmethod
+    def merge_clone_pore(cls,pn, pores, radius, resolution, imsize, side, label='clone_p'):
         pn['pore.coords'] += [resolution, resolution, resolution]
         clone = topotools.clone_pores(pn, pores, label=label)
         org_coords = np.copy(clone['pore.coords'])
@@ -1007,8 +1012,8 @@ class topotools(Base):
         clone['throat.volume'] = np.pi * radius ** 2 * clone['throat.length']
         return clone
 
-    @staticmethod
-    def connect_repu_network(pn, side):
+    @classmethod
+    def connect_repu_network(cls,pn, side):
         if side in ['right', 'left']:
             way = 0
             side1 = np.array(['right', 'left'])[~(np.array(['right', 'left']) == side)][0]
@@ -1057,8 +1062,8 @@ class topotools(Base):
         '''
         return pn
 
-    @staticmethod
-    def update_inner_info(pn):
+    @classmethod
+    def update_inner_info(cls,pn):
         print('Updating pore conns information')
         '''
         0=Pore, 1=Solid, 2=Interface

@@ -90,7 +90,7 @@ print('Absolute permeability', abs_perm)
 print('inlet velocity', output['pore.inlets'] / (imsize[1] * imsize[2] * resolution ** 2))
 t1 = time.time()
 print('using time', t1 - t0, 's')
-topotools().find_surface_KDTree(pn, ('x','y','z'), imsize, resolution, label_1=('left_surface','back_surface','bottom_surface'), label_2=('right_surface','front_surface','top_surface'))
+topotools.find_surface_KDTree(pn, ('x','y','z'), imsize, resolution, label_1=('left_surface','back_surface','bottom_surface'), label_2=('right_surface','front_surface','top_surface'))
 '''
        Z
        |
