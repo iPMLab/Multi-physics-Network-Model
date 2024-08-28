@@ -854,7 +854,7 @@ class topotools(Base):
         return result
 
     @classmethod
-    def calculate_mass_flow(cls,pn, Boundary_condition, g_ij, P_profile, Num):
+    def calculate_mass_flow(cls,pn, Boundary_condition, g_ij, P_profile, Num=None):
         cls.check_input(pn=pn)
         network_pore_void = pn['pore.void']
         network_pore_solid = pn['pore.solid']
