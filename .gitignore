@@ -8,7 +8,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
-*vtp
+*.vtp
 .Python
 build/
 develop-eggs/
