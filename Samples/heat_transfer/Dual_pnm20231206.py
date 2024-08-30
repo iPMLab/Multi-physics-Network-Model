@@ -579,11 +579,11 @@ for n in np.arange(len(re_s)):
         it_num.append(len(T_res))
         water['pore.velocity'] = Vel_Pore_profile
         # op.io.VTK.export_data(network=pn, phases=water, filename=path + '/pore_structure')
-        net.network2vtk(pn=pn, filename=path + '/pore_structure')
+        # net.network2vtk(pn=pn, filename=path + '/pore_structure')
 
         # Phase = op.phases.Water(network=dualn)
         # op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
-        net.network2vtk(pn=pn, filename=path + '/' + side + '_flow')
+        # net.network2vtk(pn=pn, filename=path + '/' + side + '_flow')
 
         layer_num = 14
         layer_way = 0  # 1,back front;0,left right;2,bottom top
@@ -669,7 +669,7 @@ for n in np.arange(len(re_s)):
         pore_h_coe = np.sum(A0, axis=0)
         # Phase['pore.h_coe'] = -pore_h_coe
 
-        net.network2vtk(pn=dualn, filename=path + '/' + side + '_flow')
+        # net.network2vtk(pn=dualn, filename=path + '/' + side + '_flow')
         # op.io.VTK.export_data(network=dualn, phases=Phase, filename=path + '/' + side + '_flow')
 
         output = topotools().calculate_heat_flow(dualn, Boundary_condition_T, g_ij, T_res[-1], thermal_con_dual,
