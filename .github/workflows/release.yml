@@ -1,0 +1,41 @@
+name: Create Release on Commit to Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Git
+        run: |
+          git config user.name "Your Name"
+          git config user.email "your.email@example.com"
+
+      - name: Generate Date Version Tag
+        id: version
+        run: echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: "Release ${{ env.VERSION }}"
+          body: |
+            Automatic release generated from commit ${{ github.sha }}.
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./path/to/your/asset.zip
+          asset_name: your-asset.zip
+          asset_content_type: application/zip
