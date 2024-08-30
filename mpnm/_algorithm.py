@@ -25,9 +25,9 @@ class algorithm(Base):
     #
     #     for keys,values in Boundary_condition:
 
-    
-    @staticmethod
-    def stead_stay_alg_multi(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
+
+    @classmethod
+    def stead_stay_alg_multi(cls,pn, fluid, coe_A, Boundary_condition, resolution, bound_cond):
         # num_pore = len(pn.pores())
         num_pore=len(pn['pore.all'])
         rows=np.empty(shape=len(pn['throat.conns'])*2, dtype=int)
@@ -104,8 +104,8 @@ class algorithm(Base):
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
     
-    @staticmethod
-    def stead_stay_alg(pn, fluid, coe_A, Boundary_condition, resolution, bound_cond=False,area_mode:str ="radius"):
+    @classmethod
+    def stead_stay_alg(cls,pn, fluid, coe_A, Boundary_condition, resolution, bound_cond=False,area_mode:str ="radius"):
         '''
         area mode choose the area calculation method
         '''
@@ -184,8 +184,8 @@ class algorithm(Base):
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
     
-    @staticmethod
-    def correct_pressure(pn, coe_A, Boundary_condition, resolution, S_term=False):
+    @classmethod
+    def correct_pressure(cls,pn, coe_A, Boundary_condition, resolution, S_term=False):
         num_pore = len(pn['pore.all'])
         rows=np.empty(shape=len(pn['throat.conns'])*2, dtype=int)
         cols=np.empty(shape=len(pn['throat.conns'])*2, dtype=int)
@@ -210,8 +210,8 @@ class algorithm(Base):
         # Profile,j=ssl.bicg(A,b,tol=1e-9)
         return Profile
     
-    @staticmethod
-    def stead_stay_alg_convection(pn, coe_A, coe_A_i, coe_B, Boundary_condition, g_ij, P_profile, fluid,
+    @classmethod
+    def stead_stay_alg_convection(cls,pn, coe_A, coe_A_i, coe_B, Boundary_condition, g_ij, P_profile, fluid,
                                   solid, imsize, resolution, side):
 
         num_node = len(pn['pore.all'])
@@ -303,8 +303,8 @@ class algorithm(Base):
         Tem_c = pp.spsolve(A_c, b)
         return Tem_c
     
-    @staticmethod
-    def stead_stay_model_tes(pn, coe_A, coe_A_i, coe_B,
+    @classmethod
+    def stead_stay_model_tes(cls,pn, coe_A, coe_A_i, coe_B,
                              Boundary_condition, x0, g_ij, P_profile,
                              imsize, resolution, side, S_term=False,
                              type_f='species'):
@@ -423,8 +423,8 @@ class algorithm(Base):
 
         return Var_c
 
-    @staticmethod
-    def transient_temperature(pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
+    @classmethod
+    def transient_temperature(cls,pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
                               solid, imsize, resolution, time_step, delta_t, side, Phase):
         num_node = len(pn['pore.all'])
         # Num = num_node // 25000
@@ -530,8 +530,8 @@ class algorithm(Base):
             # op.io.VTK.export_data(pn=pn, phases=Phase, filename='./_{}'.format(i))
         return T_res
 
-    @staticmethod
-    def transient_temperature_single(pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile,
+    @classmethod
+    def transient_temperature_single(cls,pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile,
                                      fluid, solid, imsize, resolution, delta_t, side):
         num_node = len(pn['pore.all'])
         # Num = min((num_node // 25000) + 1, 10)
@@ -633,8 +633,8 @@ class algorithm(Base):
 
         return Tem_c
     
-    @staticmethod
-    def transient_temperature_s(pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
+    @classmethod
+    def transient_temperature_s(cls,pn, coe_A, coe_A_i, coe_B, Boundary_condition, x0, g_ij, P_profile, fluid,
                                 solid, imsize, resolution, delta_t, side):
         num_node = len(pn['pore.all'])
         Num = 1
@@ -694,8 +694,8 @@ class algorithm(Base):
 
         return Tem_c
 
-    @staticmethod
-    def setting_Boundary_condition(pn, g_ij, P_profile, dig, b, Boundary_condition, resolution, imsize, Num,
+    @classmethod
+    def setting_Boundary_condition(cls,pn, g_ij, P_profile, dig, b, Boundary_condition, resolution, imsize, Num,
                                    side, type_f):
 
         if type_f == 'diffusion':
@@ -747,8 +747,8 @@ class algorithm(Base):
                     b[pn[n] & pn['pore.void']] += tem_b
         return dig, b
 
-    @staticmethod
-    def transient_energy_s(pn, coe_A, coe_A_i, coe_B,
+    @classmethod
+    def transient_energy_s(cls,pn, coe_A, coe_A_i, coe_B,
                            Boundary_condition, x0, g_ij,
                            P_profile, imsize, resolution,
                            delta_t, side, type_f='heat'):
@@ -854,8 +854,8 @@ class algorithm(Base):
 
         return Var_c
 
-    @staticmethod
-    def transient_model_test(pn, coe_A, coe_A_i, coe_B,
+    @classmethod
+    def transient_model_test(cls,pn, coe_A, coe_A_i, coe_B,
                              Boundary_condition, x0, g_ij, P_profile,
                              imsize, resolution, delta_t, side, mass_flow=False, S_term=False,
                              Bound_cond_P=False, type_f='species'):
@@ -980,8 +980,8 @@ class algorithm(Base):
         else:
             return Var_c
 
-    @staticmethod
-    def transient_model(pn, coe_A, coe_A_i, coe_B,
+    @classmethod
+    def transient_model(cls,pn, coe_A, coe_A_i, coe_B,
                         Boundary_condition, x0, g_ij, P_profile,
                         imsize, resolution, delta_t, side, type_f='species'):
 
@@ -1094,8 +1094,8 @@ class algorithm(Base):
 
         return Var_c
 
-    @staticmethod
-    def RK4(h, a, a_max, initial):
+    @classmethod
+    def RK4(cls,h, a, a_max, initial):
         func_n = lambda T: 1 / (1 / 2.976 + 0.377 * (1 - 293.15 / T))  # n0=1,alph=0 for Langmuir-Freundirch
         func_b = lambda T: 4.002 * np.exp(51800 / 8.314 / 273.15 * (
                 293.15 / T - 1))  # b0=4.002, delta_E=65572,R=8.314,T0=273.15,for Langmuir-Freundirch
