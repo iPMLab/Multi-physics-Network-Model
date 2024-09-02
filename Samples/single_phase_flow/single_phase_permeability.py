@@ -110,5 +110,3 @@ X
 
 '''
 network.network2vtk(pn, 'single_phase_permeability')
-
-print(pn)
