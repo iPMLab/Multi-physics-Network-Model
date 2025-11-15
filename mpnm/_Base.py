@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Apr 14 17:02:15 2022
-
-@author: htmt
-"""
-
 import numpy as np 
 
 class Base(dict):

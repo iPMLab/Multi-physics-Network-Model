@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Apr 26 21:22:24 2022
 
-@author: htmt
-"""
 from mpnm import network, topotools, algorithm
 import numpy as np
 import argparse

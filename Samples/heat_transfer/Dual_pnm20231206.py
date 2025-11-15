@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Dec 12 14:25:38 2021
-
-@author: htmt
-"""
-
-import sys
-
 from mpnm import topotools, algorithm, network as net
 from scipy.sparse import coo_matrix
 import numpy as np

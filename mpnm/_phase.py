@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Apr 14 17:02:52 2022
-
-@author: htmt
-"""
 from mpnm._Base import *
 import numpy as np
 

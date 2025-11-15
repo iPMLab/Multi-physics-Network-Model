@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Jun 17 18:48:35 2022
-
-@author: htmt
-"""
 import numpy as np
 from scipy.sparse import coo_matrix
 import scipy.sparse.linalg as ssl
