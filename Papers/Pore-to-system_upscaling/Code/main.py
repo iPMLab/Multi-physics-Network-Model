@@ -27,9 +27,6 @@ from Papers.P1.Code.COMSOL.comsol_params import (
     PARAMS_N4_869,
     PARAMS_N5_000,
     PARAMS_N10_000,
-    PARAMS_N5_000_marching_cube,
-    PARAMS_N5_000_voxel,
-    PARAMS_N5_000_constrained_smooth,
 )
 
 np.set_printoptions(legacy="1.21")
@@ -37,7 +34,7 @@ util.set_num_threads(4)
 
 
 def draw_comsol_pnm_graph(
-    x, y, title, Re, PARAM, save=True, xlabel="", ylabel="", percentile=95
+    x, y, title, Re, PARAM, save=True, xlabel="", ylabel="", percentile=100
 ):
     abs_error = np.abs((y - x))
     abs_error_percentile = np.percentile(abs_error, percentile)
@@ -120,19 +117,12 @@ def run_simulation(PARAM, dict_adjustments=None):
     # u_inlets = PARAM.u_inlets
     img_shape = PARAM.raw_shape
     heat_flux_out = PARAM.heat_flux_out
-    # area_outlet = PARAM.area_outlet
     area_inlet = PARAM.area_inlet
 
-    # u_inlets_str = PARAM.u_inlets.astype(str)
-    # heat_flux_in = PARAM.heat_flux_in
-    # mpn_name = PARAM.name_pnm
     Path_net_pore = PARAM.Path_net_pore
-    # Path_net_solid = PARAM.Path_net_solid
     Path_net_dual = PARAM.Path_net_dual
-    # Dict_Path_PTU_min_max_ave_comsol = PARAM.Dict_Path_PTU_min_max_ave_comsol
-    # Dict_Path_flux_pos_neg_comsol = PARAM.Dict_Path_flux_pos_neg_comsol
+
     Path_results = PARAM.Path_results
-    # Path_comsol = PARAM.Path_comsol
     Path_PNdata = PARAM.Path_PNdata
 
     Path_figs = PARAM.Path_results / "figs"
@@ -146,10 +136,6 @@ def run_simulation(PARAM, dict_adjustments=None):
     adjust = bool(1)
     opt = {}
     opt = defaultdict(lambda: 1)
-    # opt["value"] = {
-    #     "T_inlet": 293.15,
-    #     "T_heat": heat_flux_in,
-    # }
 
     if adjust:
         opt["pn['throat.radius']"] = dict_adjustments.get("pn['throat.radius']", 1.0)
@@ -181,14 +167,10 @@ def run_simulation(PARAM, dict_adjustments=None):
     dualn["throat.radius"][dualn["throat.solid"]] *= 1.0
     dualn["throat.radius"][dualn["throat.connect"]] *= 1.0
     dualn["pore.radius"][dualn["pore.void"]] *= 1.0
-    # dualn["pore.radius"][dualn["pore.solid"]] *= 20
 
     num_solid_ball = np.count_nonzero(dualn["pore.solid"])
     num_void_ball = np.count_nonzero(dualn["pore.void"])
     print(num_void_ball, num_solid_ball)
-
-    # for i in ["x-", "x+", "z-", "z+", "y-", "y+"]:
-    #     dualn[f"pore.surface_{i}"][dualn["pore.void"]] += pn[f"pore.surface_{i}"]
 
     dualn["pore.U"] = np.zeros(len(dualn["pore.all"]))
     dualn["pore.flux"] = np.zeros(len(dualn["pore.all"]))
@@ -214,11 +196,8 @@ def run_simulation(PARAM, dict_adjustments=None):
     solid["initial_temperature"] = T_fluid
     # material = "copper"
     ############ physical properties ############
-
     pn["properties"] = {"resolution": resolution, "img_size": imsize}
     dualn["properties"] = pn["properties"]
-    # inlet_area = np.sum(pn['pore.radius'][pn['pore.surface_x-']] ** 2 * np.pi)
-    # inlet_area = np.sum(pn['pore.surface_x-_area'])
 
     Params = ["p", "T", "spf.U"]
     specific_params = [
@@ -257,10 +236,6 @@ def run_simulation(PARAM, dict_adjustments=None):
         for i, specific_param in enumerate(specific_params):
             PTU_min_max_ave_comsol[:, i] = PNdata_i[specific_param]
         PTU_min_max_ave_comsol[PTU_min_max_ave_comsol < 0] = 0
-        # flux_pos_neg_comsol = pd.read_csv(
-        #     Dict_Path_flux_pos_neg_comsol[u_str], engine="pyarrow"
-        # )
-        # # flux_comsol
 
         for key in keys_index_map:
             dualn[key] = PTU_min_max_ave_comsol[:, keys_index_map[key]]
@@ -292,15 +267,8 @@ def run_simulation(PARAM, dict_adjustments=None):
         dualn["throat.heat_flux_total_comsol"] = (
             throat_heat_flux_conductive_comsol + throat_heat_flux_convective_comsol
         )
-
-        # dualn["throat.heat_flux_total_comsol"] = PNdata_i["throat.heat_flux_total_comsol"]
-
         delta_T_comsol = dualn["pore.T_ave_comsol"][dualn["throat.conns"]]
         delta_T_comsol = delta_T_comsol[:, 0] - delta_T_comsol[:, 1]
-        # coe_B_comsol = dualn["throat.heat_flux_conductive_comsol"] / delta_T_comsol
-        # coe_B_comsol = np.abs(
-        #     np.nan_to_num(coe_B_comsol, nan=0, posinf=10000, neginf=10000)
-        # )
 
         print("alpha=", opt["alpha"])
 
@@ -338,17 +306,13 @@ def run_simulation(PARAM, dict_adjustments=None):
             dualn[f"pore.surface_{inlet}"] & dualn["pore.void"]
         )[0]
         Boundary_condition_T_inlet["types"] = BC_Type.dirichlet
-        # Boundary_condition_T_inlet['values'] = dualn['pore.T_ave_comsol'][Boundary_condition_T_inlet['ids']]
         Boundary_condition_T_inlet["values"] = 293.15
         Boundary_condition_T_inlet["names"] = "pore_inlet_T"
 
         Boundary_condition_T_outlet = pd.DataFrame()
         Boundary_condition_T_outlet["ids"] = np.where(dualn["pore.surface_z-"])[0]
         Boundary_condition_T_outlet["types"] = BC_Type.neumann
-        # Boundary_condition_T_outlet["types"] = BC_Type.dirichlet
-        # Boundary_condition_T_outlet["values"] = hf_i
         area = dualn["pore.surface_area_z-"][Boundary_condition_T_outlet["ids"]]
-        # Boundary_condition_T_outlet['values'] = dualn['pore.T_ave_comsol'][Boundary_condition_T_outlet['ids']]
         Boundary_condition_T_outlet["values"] = hf_i * area
         Boundary_condition_T_outlet["names"] = "pore_inlet_T1"
 
@@ -391,10 +355,6 @@ def run_simulation(PARAM, dict_adjustments=None):
                 )
 
         T_res = []
-        # u= np.around(vel,3)[n]#
-        # P=  int(u*imsize[0] *resolution/Perm*np.average(pn['pore.viscosity']))
-
-        # Boundary_condition_P['pore_inlet'] = {'pore.' + inlet + '_surface': [u, 'Neumann']}
 
         # u=np.array([0.10])[n]#
         dualn["pore.viscosity"][:] = fluid["viscosity"]
@@ -402,11 +362,6 @@ def run_simulation(PARAM, dict_adjustments=None):
 
         dualn["throat.viscosity"][:] = fluid["viscosity"]
         pn["throat.viscosity"] = dualn["throat.viscosity"][dualn["throat.void"]]
-
-        # coe_A_P=np.array(topotools.Mass_conductivity(pn))/pn['throat.total_length']
-        # P_profile_tem=algorithm.stead_stay_alg(pn,fluid,coe_A_P,Boundary_condition_P,resolution,False)
-        # output=topotools.calculate_mass_flow(pn,Boundary_condition_P,coe_A_P,P_profile_tem,4)
-        # ---------------'''pressure process '''---------------#
 
         T_x0[:] = Tem_c
         dualn["pore.viscosity"][:] = fluid["viscosity"]
@@ -475,14 +430,6 @@ def run_simulation(PARAM, dict_adjustments=None):
         pn["pore.U"] = Vel_Pore_profile
         dualn["pore.U"] = np.zeros(len(dualn["pore.all"]))
         dualn["pore.U"][dualn["pore.void"]] = Vel_Pore_profile
-        # if plot:
-        #     plt.scatter(dualn['pore.U_ave_comsol'][dualn['pore.void']][pn['pore.' + outlet + '_surface']],
-        #                 dualn['pore.U'][dualn['pore.void']][pn['pore.' + outlet + '_surface']])
-        #     plt.plot(np.linspace(Vel_Pore_profile[pn['pore.' + outlet + '_surface']].min(),
-        #                          Vel_Pore_profile[pn['pore.' + outlet + '_surface']].max(), 20),
-        #              np.linspace(Vel_Pore_profile[pn['pore.' + outlet + '_surface']].min(),
-        #                          Vel_Pore_profile[pn['pore.' + outlet + '_surface']].max(), 20), c='r')
-        #     plt.show()
         RE_po = np.zeros(len(dualn["pore.all"]))
         RE_po[dualn["pore.void"]] = (
             Vel_Pore_profile
@@ -491,55 +438,8 @@ def run_simulation(PARAM, dict_adjustments=None):
             * fluid["density"]
             / pn["pore.viscosity"]
         )
-        # x0 = (
-        #     dualn["pore.void"] * fluid["initial_temperature"]
-        #     + dualn["pore.solid"] * solid["initial_temperature"]
-        # )
         g_ij = np.zeros(len(dualn["throat._id"]))
         g_ij[dualn["throat.void"]] = coe_A_P
-
-        # Pr_num = dualn["pore.Cp"] * dualn["pore.viscosity"] / dualn["pore.lambda"]
-        # heat_coe = (2 + (0.4 * RE_po ** 0.5 + 0.06 * RE_po ** 0.667) * Pr_num ** 0.4) * dualn[
-        #     'pore.lambda']  # Nusselt
-        # f_Pr = 0.564 / (1 + (1.664 * Pr_num ** (1 / 6)) ** (9 / 2)) ** (2 / 9)
-        # a = -3.99495033
-        # b = 1.58864806
-        # L = 0.08
-        # heat_coe = 2 / np.pi ** (1 / 2) * (
-        #         (3.24 * f_Pr * RE_po / 16) ** 5 + (3 / 2 * 0.393 * (f_Pr * RE_po / L) ** (1 / 3)) ** 5) ** (
-        #                    1 / 5) # np.exp(a * dualn['pore.shape_factor'] + b)
-        # heat_coe = (
-        #     2
-        #     + (0.4 * RE_po**0.5 + 0.06 * RE_po ** (2 / 3))
-        #     * Pr_num**0.4
-        #     * (293.15 / 293.15) ** 0.25
-        # )  # * dualn['pore.lambda']  # Nusselt
-        # heat_coe[num_void_ball:] = 0
-        # plt.scatter(RE_po[:len(pn['pore._id'])], heat_coe[:len(pn['pore._id'])])
-        # plt.show()
-
-        # heat_s_f = dualn["throat.length"] / (
-        #     dualn["pore.radius"][dualn["throat.conns"][:, 0]]
-        #     * length
-        #     / (heat_coe[dualn["throat.conns"][:, 0]] * fluid["lambda"])
-        #     + dualn["pore.radius"][dualn["throat.conns"][:, 1]]
-        #     * length
-        #     / (solid["lambda"])
-        # )
-
-        # heat_s_f = (
-        #     dualn["throat.length"]
-        #     * 1
-        #     / (
-        #         dualn["pore.radius"][dualn["throat.conns"][:, 0]]
-        #         * length
-        #         / (fluid["lambda"])
-        #         + dualn["pore.radius"][dualn["throat.conns"][:, 1]]
-        #         * length
-        #         / (solid["lambda"])
-        #     )
-        # )
-        # heat_s_f = fluid["lambda"]*8
 
         # coe_A for convection heat transfer
         total_r = np.sum(dualn["pore.radius"][dualn["throat.conns"]], axis=1)
@@ -552,21 +452,12 @@ def run_simulation(PARAM, dict_adjustments=None):
             len0 / fluid["lambda"] + len1 / solid["lambda"]
         )
 
-        # print(heat_s_f)
-
         thermal_con_dual = (
             dualn["throat.solid"] * dualn["throat.lambda"]
             + dualn["throat.connect"] * heat_s_f
             + dualn["throat.void"] * dualn["throat.lambda"]
         )
 
-        # thermal_con_dual = (
-        #     dualn["throat.solid"] * dualn["throat.lambda"]
-        #     + dualn["throat.connect"]
-        #     * (2 * fluid["lambda"] * solid["lambda"])
-        #     / (fluid["lambda"] + solid["lambda"])
-        #     + dualn["throat.void"] * dualn["throat.lambda"]
-        # )
         coe_B = (
             dualn["throat.radius"] ** 2
             * np.pi
@@ -574,15 +465,6 @@ def run_simulation(PARAM, dict_adjustments=None):
             / dualn["throat.length"]
         )
 
-        # coe_B = np.where(coe_B != 0, coe_B, coe_B_)
-        # coe_B for thermal conductivity matrix calculating
-
-        # _----------------------------steady-state-------------------------------#
-
-        # Tem_c = algorithm.two_phase_steady_convection_algorithm(dualn, 'T', g_ij, coe_B,
-        #                                                         Boundary_condition_T, P_profile, fluid, solid,
-        #                                                         area_mode='surface_area')
-        # coe_B = coe_B_comsol
         Tem_c = algorithm.two_phase_steady_convection_algorithm2(
             dualn,
             g_ij,
@@ -590,26 +472,15 @@ def run_simulation(PARAM, dict_adjustments=None):
             Boundary_condition_T2,
             P_profile,
         )
-        # np.where(
-        # dualn["pore.void"], dualn["pore.radius"] / 5, 1e-20
-        # ),
 
         hf_output = topotool.calculate_heat_flow2(
             dualn, Boundary_condition_T2, g_ij, Tem_c, coe_B, P_profile
         )
-        # z_neg_surface = dualn['pore.surface_z-']
 
         print(hf_output)
         dualn["pore.T"] = Tem_c
         # print(Tem_c)
         T_res.append(Tem_c)
-
-        # Tem_c = algorithm.single_phase_steady_algorithm2(
-        #     dualn,
-        #     coefficient=coe_B,
-        #     viscosity_pore=0.1,
-        #     boundary_conditions=Boundary_condition_T2,
-        # )
 
         pore0 = dualn["throat.conns"][:, 0]
         pore1 = dualn["throat.conns"][:, 1]
@@ -618,7 +489,6 @@ def run_simulation(PARAM, dict_adjustments=None):
 
         delta_T = Tem_c[pore0] - Tem_c[pore1]
         throat_heat_flux_conductive = coe_B * delta_T
-        # throat_heat_flux_conductive[dualn["throat.connect"]] = 0
 
         throat_heat_flux_convective = (
             throat_flux
@@ -631,79 +501,12 @@ def run_simulation(PARAM, dict_adjustments=None):
             throat_heat_flux_conductive + throat_heat_flux_convective
         )
 
-        # from sklearn.cluster import AgglomerativeClustering
-
-        # G = nx.Graph()
-        # for pore_id in dualn["pore._id"]:
-        #     G.add_node(pore_id, pos=dualn["pore.coords"][pore_id])
-        # for (u, v), weight in zip(dualn["throat.conns"], np.abs(throat_heat_flux_total)):
-        #     G.add_edge(u, v, weight=weight)
         dualn["throat.heat_flux_conductive"] = throat_heat_flux_conductive
         dualn["throat.heat_flux_convective"] = throat_heat_flux_convective
         dualn["throat.heat_flux_total"] = throat_heat_flux_total
         dualn["throat.flux"] = throat_flux
 
         if plot:
-            # draw_comsol_pnm_graph(
-            #     x=pn["throat.fluid_flux_comsol"],
-            #     y=throat_flux[dualn["throat.void"]],
-            #     title="Throat flux",
-            #     Re=Re_i,
-            #     xlabel=r"$DNS\ flux\ (m^3/s)$",
-            #     ylabel=r"$DNM\ flux\ (m^3/s)$",
-            #     PARAM=PARAM,
-            # )
-
-            # draw_comsol_pnm_graph(
-            #     x=dualn["throat.heat_flux_conductive_comsol"][dualn["throat.solid"]],
-            #     y=throat_heat_flux_conductive[dualn["throat.solid"]],
-            #     title="Solid throat conductive heat flux",
-            #     Re=Re_i,
-            #     xlabel=r"$DNS\ flux\ (W)$",
-            #     ylabel=r"$DNM\ flux\ (W)$",
-            #     PARAM=PARAM,
-            # )
-
-            # draw_comsol_pnm_graph(
-            #     x=dualn["throat.heat_flux_conductive_comsol"][dualn["throat.void"]],
-            #     y=throat_heat_flux_conductive[dualn["throat.void"]],
-            #     title="Void throat conductive heat flux",
-            #     Re=Re_i,
-            #     xlabel=r"$DNS\ flux\ (W)$",
-            #     ylabel=r"$DNM\ flux\ (W)$",
-            #     PARAM=PARAM,
-            # )
-
-            # draw_comsol_pnm_graph(
-            #     x=dualn["throat.heat_flux_conductive_comsol"][dualn["throat.connect"]],
-            #     y=throat_heat_flux_conductive[dualn["throat.connect"]],
-            #     title="Interfacial throat conductive heat flux",
-            #     Re=Re_i,
-            #     xlabel=r"$DNS\ flux\ (W)$",
-            #     ylabel=r"$DNM\ flux\ (W)$",
-            #     PARAM=PARAM,
-            # )
-
-            # draw_comsol_pnm_graph(
-            #     x=dualn["throat.heat_flux_convective_comsol"][dualn["throat.void"]],
-            #     y=throat_heat_flux_convective[dualn["throat.void"]],
-            #     title="Void throat convective heat flux",
-            #     Re=Re_i,
-            #     xlabel=r"$DNS\ flux\ (W)$",
-            #     ylabel=r"$DNM\ flux\ (W)$",
-            #     PARAM=PARAM,
-            # )
-
-            # draw_comsol_pnm_graph(
-            #     x=dualn["throat.heat_flux_total_comsol"],
-            #     y=throat_heat_flux_total,
-            #     title="Throat total heat flux",
-            #     Re=Re_i,
-            #     xlabel=r"$DNS\ flux\ (W)$",
-            #     ylabel=r"$DNM\ flux\ (W)$",
-            #     PARAM=PARAM,
-            # )
-
             draw_comsol_pnm_graph(
                 x=dualn["pore.p_ave_comsol"][dualn["pore.void"]],
                 y=dualn["pore.P"][dualn["pore.void"]],
@@ -713,25 +516,6 @@ def run_simulation(PARAM, dict_adjustments=None):
                 ylabel=r"$DNM\ (Pa)$",
                 PARAM=PARAM,
             )
-            # draw_comsol_pnm_graph(
-            #     x=dualn["pore.p_pore_center_comsol"][dualn["pore.void"]],
-            #     y=dualn["pore.P"][dualn["pore.void"]],
-            #     title="Pore center pressure",
-            #     Re=Re_i,
-            #     xlabel=r"$DNS\ (Pa)$",
-            #     ylabel=r"$DNM\ (Pa)$",
-            #     PARAM=PARAM,
-            # )
-
-            # dualn["pore.error_U"] = np.abs(
-            #     dualn["pore.U"] - dualn["pore.U_pore_center_comsol"]
-            # ) > np.percentile(
-            #     np.abs(
-            #         dualn["pore.U"][dualn["pore.void"]]
-            #         - dualn["pore.U_pore_center_comsol"][dualn["pore.void"]]
-            #     ),
-            #     100,
-            # )
             dualn["pore.error_T"] = np.abs(
                 dualn["pore.T"] - dualn["pore.T_ave_comsol"]
             ) > np.percentile(
@@ -742,12 +526,8 @@ def run_simulation(PARAM, dict_adjustments=None):
                 100,
             )
 
-            void_true_bool = dualn[
-                "pore.void"
-            ]  # & ~dualn['pore.surface_x-'] & ~dualn['pore.surface_z-'] & ~dualn['pore.error_T'] & ~dualn['pore.error_U']
-            solid_true_bool = dualn[
-                "pore.solid"
-            ]  # & ~dualn['pore.surface_x-'] & ~dualn['pore.surface_z-']  & ~dualn['pore.error_T']
+            void_true_bool = dualn["pore.void"]
+            solid_true_bool = dualn["pore.solid"]
 
             draw_comsol_pnm_graph(
                 x=pn["pore.spf.U_ave_comsol"],
@@ -798,28 +578,8 @@ def run_simulation(PARAM, dict_adjustments=None):
                 ylabel=r"$T_{DNM}$ (K)",
                 PARAM=PARAM,
             )
-
-            # flow_rate = np.abs(
-            #     topotool.mass_balance_conv(pn, g_ij, P_profile, pn["pore._id"])
-            # )
-            # print(
-            #     flow_rate[
-            #         ~((dualn["pore.surface_z-"]) | (dualn["pore.surface_z+"]))[
-            #             dualn["pore.void"]
-            #         ]
-            #     ].max()
-            # )
-            # df = pd.DataFrame(pn)
-            # df.to_csv('pn.csv')
-            print(Pressure_drop, Re_i, Perm)
-            pn["pore.T"] = dualn["pore.T"][dualn["pore.void"]]
-            pn["pore.Re"] = RE_po[dualn["pore.void"]]
-        # hf_void = np.sum(
-        #     dualn['pore.volume'][dualn['pore.void']] * dualn['pore.T'][dualn['pore.void']] * fluid['Cp'] * fluid[
-        #         'density'])
-        # hf_solid = np.sum(
-        #     dualn['pore.volume'][dualn['pore.solid']] * dualn['pore.T'][dualn['pore.solid']] * solid['Cp'] * solid[
-        #         'density'])
+        pn["pore.T"] = dualn["pore.T"][dualn["pore.void"]]
+        pn["pore.Re"] = RE_po[dualn["pore.void"]]
 
         outlet_void_tem = np.average(
             dualn["pore.T"][dualn["pore.void"] & dualn["pore.surface_x+"]],
@@ -831,12 +591,7 @@ def run_simulation(PARAM, dict_adjustments=None):
         )
         print("PNM", outlet_void_tem)
         print("COMSOL", outlet_void_tem_comsol)
-        # print(np.average(dualn['pore.T'][void_true_bool], weights=dualn['pore.volume'][void_true_bool]))
-        # print(np.average(dualn['pore.T_ave_comsol'][void_true_bool], weights=dualn['pore.volume'][void_true_bool]))
-        # print(np.average(dualn['pore.T'][solid_true_bool], weights=dualn['pore.volume'][solid_true_bool]))
-        # print(np.average(dualn['pore.T_ave_comsol'][solid_true_bool], weights=dualn['pore.volume'][solid_true_bool]))
-        # flux = topotool.calculate_pore_flux(pn, coe_A_P, P_profile, pn["pore._id"])
-        # print(flux)
+
         pore_flux = topotool.cal_pore_flux(pn, coe_A_P, P_profile, pn["pore._id"])
         Q_flux_pn = np.sum(
             np.abs(pore_flux[pn["pore.surface_x+"]])
@@ -845,9 +600,7 @@ def run_simulation(PARAM, dict_adjustments=None):
             * fluid["density"]
         )
         print("Q_flux_pn", Q_flux_pn)
-        # Q_flux_comsol = np.sum(np.abs(pore_flux[pn['pore.surface_x+']]) * (
-        #         dualn['pore.T_ave_comsol'][dualn['pore.surface_x+'] & dualn['pore.void']] - 293.15) * fluid['Cp'] * fluid[
-        #                            'density'])
+
         Q_flux_comsol = dualn["properties"]["hf_comsol"]
         dualn["pore.hf_pn"] = dualn["pore.all"] * Q_flux_pn
         dualn["pore.P_pn"] = dualn["pore.all"] * (
@@ -855,10 +608,6 @@ def run_simulation(PARAM, dict_adjustments=None):
                 pn["pore.P"][pn["pore.surface_x-"]],
                 weights=pn["pore.volume"][pn["pore.surface_x-"]],
             )
-            # - np.average(
-            #     pn["pore.P"][pn["pore.surface_x+"]],
-            #     weights=pn["pore.volume"][pn["pore.surface_x+"]],
-            # )
         )
         # print(dualn["pore.P_pn"])
         print("Q_flux_comsol", Q_flux_comsol)
@@ -905,8 +654,6 @@ def run_simulation(PARAM, dict_adjustments=None):
     Re_hf_len = len(Re_hf)
     print(Re_hf)
 
-    # heat_flux_pn = []
-    # heat_flux_comsol = []
     for i in range(Re_hf_len):
         Re_i = Re_hf[i][0]
         hf_i = Re_hf[i][1]
