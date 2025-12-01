@@ -71,6 +71,10 @@ Located in `sample_data/Sphere_stacking_250_500_2800_20/`, including:
 - Pore network files
 - Solid network files (`solid_center_*.csv`, `dual_network_interface_*.csv`, etc.)
 
+---
+
+### Example 3: Reaction flow (uploading)
+
 🔧 **Features**:
 
 - Iterative coupling between pressure and temperature fields
