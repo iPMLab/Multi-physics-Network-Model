@@ -96,8 +96,8 @@ This example demonstrates MpNM’s capability in multi-physics, multi-domain sim
 
 For questions, collaboration, or access to additional demos and documentation, please contact:
 
+- Jinping Yang – [12227053@zju.edu.cn](mailto:12227053@zju.edu.cn)
 - Qingyang Lin – [qingyan_lin@zju.edu.cn](mailto:qingyan_lin@zju.edu.cn)
 - Mingliang Qu – [mingliangqu@zju.edu.cn](mailto:mingliangqu@zju.edu.cn)
-- Jinping Yang – [12227053@zju.edu.cn](mailto:12227053@zju.edu.cn)
 
 We welcome contributions and feedback from the porous media and computational physics communities!
