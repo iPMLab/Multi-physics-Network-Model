@@ -1,0 +1,20 @@
+# pip install -r requirements.txt
+# Here is the list of required packages:
+numpy
+numba
+# icc_rt
+intel-cmplr-lib-rt
+joblib
+edt
+sparse_dot_mkl
+scikit-image
+tqdm
+scipy
+pandas
+xxhash
+mkl
+pypne
+
+### Optional dependencies:
+matplotlib
+h5py
