@@ -94,45 +94,6 @@ def draw_comsol_pnm_graph(
     plt.show()
 
 
-def draw_3d_graph(G, mst=None, pos=None):
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection="3d")
-
-    if pos is None:
-        pos = nx.spring_layout(G, dim=3)  # 3D布局
-
-    # 提取节点坐标
-    x = np.array([pos[node][0] for node in G.nodes()])
-    y = np.array([pos[node][1] for node in G.nodes()])
-    z = np.array([pos[node][2] for node in G.nodes()])
-
-    # 绘制所有节点
-    ax.scatter(x, y, z, c="blue", s=100, alpha=0.6)
-
-    # 绘制所有边（灰色）
-    for edge in G.edges():
-        x_vals = [pos[edge[0]][0], pos[edge[1]][0]]
-        y_vals = [pos[edge[0]][1], pos[edge[1]][1]]
-        z_vals = [pos[edge[0]][2], pos[edge[1]][2]]
-        ax.plot(x_vals, y_vals, z_vals, "gray", alpha=0.5, linewidth=1)
-
-    # 如果有最大生成树，绘制红色边
-    if mst is not None:
-        for edge in mst.edges():
-            x_vals = [pos[edge[0]][0], pos[edge[1]][0]]
-            y_vals = [pos[edge[0]][1], pos[edge[1]][1]]
-            z_vals = [pos[edge[0]][2], pos[edge[1]][2]]
-            ax.plot(x_vals, y_vals, z_vals, "red", linewidth=2)
-
-    # 添加标签
-    # for node in G.nodes():
-    #     ax.text(pos[node][0], pos[node][1], pos[node][2], node, color="black")
-
-    ax.set_title("3D Network with Maximum Spanning Tree (Red)")
-    plt.tight_layout()
-    plt.show()
-
-
 def r2_score(y_true, y_pred):
     """
     Calculate the R^2 score.
@@ -628,9 +589,6 @@ def run_simulation(PARAM, dict_adjustments=None):
             coe_B,
             Boundary_condition_T2,
             P_profile,
-            void_boundary_len=np.where(
-                dualn["pore.void"], dualn["pore.radius"] / 5, 1e-20
-            ),
         )
         # np.where(
         # dualn["pore.void"], dualn["pore.radius"] / 5, 1e-20
