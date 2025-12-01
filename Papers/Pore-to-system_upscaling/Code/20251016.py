@@ -982,49 +982,21 @@ if __name__ == "__main__":
             "pn['throat.radius']": 0.932,
             "dualn['throat.length'][dualn['throat.connect']]": 1.15,
         },
-        "_N5.000": {
-            "pn['throat.radius']": 0.98,
+        "_N10.000": {
+            "pn['throat.radius']": 0.932,
             "dualn['throat.length'][dualn['throat.connect']]": 1.15,
         },
-        "_N10.000": {
-            "pn['throat.radius']": 1,
-            "dualn['throat.length'][dualn['throat.connect']]": 1,
-        },
-        # "_N10.000": {
-        #     "pn['throat.radius']": 0.9,
-        #     "dualn['throat.length'][dualn['throat.connect']]": 1.4,
-        # },
-        # "_N10.000": {
-        #     "pn['throat.radius']": 0.942,
-        #     "dualn['throat.length'][dualn['throat.connect']]": 1.3,
-        # },
-        # "_N10.000": {
-        #     "pn['throat.radius']": 0.932,
-        #     "dualn['throat.length'][dualn['throat.connect']]": 1.25,
-        # },
-        # "_N10.000": {
-        #     "pn['throat.radius']": 0.9285,
-        #     "dualn['throat.length'][dualn['throat.connect']]": 1.25,
-        # },
-        # "_N10.000": {
-        #     "pn['throat.radius']": 0.932,
-        #     "dualn['throat.length'][dualn['throat.connect']]": 1.15,
-        # },
-        # "_N10.000": {
-        #     "pn['throat.radius']": 0.922,
-        #     "dualn['throat.length'][dualn['throat.connect']]": 1.16,
-        # },
     }
     import time
 
     for PARAM in [
-        # *PARAMS_N4_689,
-        # *PARAMS_N2_500,
-        # *PARAMS_N3_455,
-        # *PARAMS_N4_353,
-        # *PARAMS_N4_869,
+        *PARAMS_N4_689,
+        *PARAMS_N2_500,
+        *PARAMS_N3_455,
+        *PARAMS_N4_353,
+        *PARAMS_N4_869,
         *PARAMS_N5_000,
-        # *PARAMS_N10_000,
+        *PARAMS_N10_000,
     ]:
         t0 = time.time()
         print(PARAM.prefix)
@@ -1035,4 +1007,3 @@ if __name__ == "__main__":
         print(PARAM.prefix, "time:", time.time() - t0)
 
 tend = time.time()
-# print("total time cost:%.6fs" % (tend - t0))
