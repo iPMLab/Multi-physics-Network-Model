@@ -1,8 +1,9 @@
 from ._network import (
-    load_Statoil,
-    read_network,
-    network2vtk,
-    vtk2network,
+    coordination_number,
     getting_zoom_value,
+    load_Statoil,
+    network2vtk,
+    read_network,
     read_pypne,
+    vtk2network,
 )

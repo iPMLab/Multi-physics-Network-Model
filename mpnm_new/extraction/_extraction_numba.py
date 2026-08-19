@@ -5,7 +5,7 @@ from typing import Tuple
 from scipy import ndimage as ndi
 from ._minkowski_numba import nb_functionals_2d, nb_functionals_3d
 from ._edt_numba import nb_edt
-
+from ..util._PARAM_JIT import PARAM_JIT
 # def _build_variable_indices(band: np.ndarray) -> np.ndarray:
 #     num_variables = np.count_nonzero(band)
 #     variable_indices = np.full(band.shape, -1, dtype=np.int32)
@@ -147,7 +147,7 @@ from ._edt_numba import nb_edt
 #     return filterq
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_buildq(variable_indices):
     ndim = variable_indices.ndim
     direction_num = 4 if ndim == 2 else 6
@@ -217,7 +217,7 @@ def nb_buildq(variable_indices):
     return rows_cols_data
 
 
-@nb.njit(parallel=False, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=False, **PARAM_JIT)
 def nb_binary_dilation(
     image: np.ndarray, structure: np.ndarray, iterations: int = 1
 ) -> np.ndarray:
@@ -284,7 +284,7 @@ def nb_binary_dilation(
     return new_image
 
 
-@nb.njit(parallel=False, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=False, **PARAM_JIT)
 def nb_binary_erosion(
     image: np.ndarray, structure: np.ndarray, iterations: int = 1
 ) -> np.ndarray:
@@ -361,7 +361,7 @@ def nb_binary_erosion(
     return new_image
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_max_filter_non_padding(image_padded, struct):
     """
     image_padded is original image to be padded with np.pad(((struct.shape[0] // 2, struct.shape[0] // 2),)*ndim)
@@ -421,7 +421,7 @@ def nb_max_filter_non_padding(image_padded, struct):
     return new_image
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_compute_surface_area_voxel(grid):
     area = 0
     nx, ny, nz = grid.shape
@@ -446,7 +446,7 @@ def nb_compute_surface_area_voxel(grid):
     return area
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_get_objects_volume(labeled_image, label_max):
     label_num = label_max + 1
     nz, ny, nx = labeled_image.shape
@@ -472,3 +472,15 @@ def nb_get_objects_volume(labeled_image, label_max):
                 x_max[value] = max(x_max[value], x + 1)
                 volume[value] += 1
     return z_min, z_max, y_min, y_max, x_min, x_max, volume
+
+
+@nb.njit(parallel=True, **PARAM_JIT)
+def nb_get_throat_types(throat_conns, throat_conns_types, throat_types):
+    res = np.full(throat_conns.shape[0], -1, dtype=np.int32)
+    map_dict = {}
+    for i in range(throat_types.size):
+        map_dict[(throat_conns_types[i, 0], throat_conns_types[i, 1])] = throat_types[i]
+
+    for i in nb.prange(throat_conns.shape[0]):
+        res[i] = map_dict.get((throat_conns[i, 0], throat_conns[i, 1]), np.int32(-1))
+    return res

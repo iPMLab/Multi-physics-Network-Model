@@ -1,10 +1,11 @@
 import numba as nb
 import numpy as np
+from ..util._PARAM_JIT import PARAM_JIT
 
 INF_FLOAT32 = np.finfo(np.float32).max
 
 
-@nb.njit(parallel=False, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=False, **PARAM_JIT)
 def nb_squared_edt_1d(f, w, apply_envelope):
     n = f.size
     if n == 0:
@@ -61,7 +62,7 @@ def nb_squared_edt_1d(f, w, apply_envelope):
             f[i] = dist_sq + ff[vk]
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_edt(binary_img, wx=1.0, wy=1.0, wz=1.0, black_border=False):
     """
     Compute Euclidean Distance Transform for 2D or 3D binary image.

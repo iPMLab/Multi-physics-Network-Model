@@ -14,12 +14,9 @@ def pardisoinit(mtype, cache=OrderedDict()):
         return cache[mtype]
     else:
         pt, iparm = _pardisoinit(mtype=mtype)
-        # iparm[3] = 61
-        # iparm[10] = 1
-        # iparm[12] = 1
-        # iparm[8] = 25
-        # iparm[9] = 25
-        # iparm[23] = 10
+        iparm[7] = 10
+        iparm[10] = 1
+        iparm[12] = 1
         cache[mtype] = (pt, iparm)
         return pt, iparm
 
@@ -70,6 +67,7 @@ def single_phase_steady_iteration_algorithm(
     E=27,
     n=0.296,
     m=1.0,
+    gamma=1.0,
 ):
     if "pore.P" not in mpn:
         mpn["pore.P"] = np.zeros(mpn["pore._id"].size, dtype=np.float64)
@@ -119,7 +117,9 @@ def single_phase_steady_iteration_algorithm(
                 / mpn_throat_viscosity
                 / mpn_throat_radius
             )
-            coefficient = func_g(mpn, throat_flux, Re_throat, C=C, E=E, n=n, m=m)
+            coefficient = func_g(
+                mpn, throat_flux, Re_throat, C=C, E=E, n=n, m=m, gamma=gamma
+            )
 
     return mpn_pore_P, coefficient
 
@@ -175,9 +175,8 @@ def single_phase_steady_algorithm2(
     coefficients[:num_throat] = coefficient
     coefficients[num_throat:num_nondig] = coefficient
 
-    dig = np.bincount(
-        rows[:num_nondig], weights=coefficients[:num_nondig], minlength=num_pore
-    )
+    dig = np.zeros(shape=num_pore, dtype=np.float64)
+    add_at(arr=dig, indices=rows[:num_nondig], values=coefficients[:num_nondig])
 
     b = np.zeros(shape=num_pore, dtype=np.float64)
 
@@ -190,9 +189,11 @@ def single_phase_steady_algorithm2(
             apply_bc_neumann(b, group)
 
     coefficients[num_nondig:] = -dig
-
+    nonzero_mask = coefficients != 0
     coefficients_adjacency_matrix = csr_array(
-        (coefficients, (rows, cols)), shape=(num_pore, num_pore), dtype=np.float64
+        (coefficients[nonzero_mask], (rows[nonzero_mask], cols[nonzero_mask])),
+        shape=(num_pore, num_pore),
+        dtype=np.float64,
     )
 
     Profile = spsolve(coefficients_adjacency_matrix, b)
@@ -221,7 +222,6 @@ def two_phase_steady_convection_algorithm2(
             "throat.lambda",
         ),
     )
-    # bc_names = np.asarray(boundary_conditions['names'])
 
     mpn_pore_solid = mpn["pore.solid"]
     mpn_pore_void = mpn["pore.void"]
@@ -253,32 +253,29 @@ def two_phase_steady_convection_algorithm2(
 
     convention_fluid = mpn["pore.density"] * mpn["pore.Cp"] * flux_pore
 
-    num_nondig = num_throat * 4
+    num_nondig = num_throat * 2
     num_total = num_nondig + num_pore
 
     rows = np.empty(shape=num_total, dtype=np.int64)
     rows[:num_throat] = mpn_throat_conns_col_0
     rows[num_throat : num_throat * 2] = mpn_throat_conns_col_1
-    rows[num_throat * 2 : num_throat * 3] = mpn_throat_conns_col_0
-    rows[num_throat * 3 : num_nondig] = mpn_throat_conns_col_1
+
     rows[num_nondig:] = mpn_pore__id
 
     cols = np.empty(shape=num_total, dtype=np.int64)
     cols[:num_throat] = mpn_throat_conns_col_1
     cols[num_throat : num_throat * 2] = mpn_throat_conns_col_0
-    cols[num_throat * 2 : num_throat * 3] = mpn_throat_conns_col_1
-    cols[num_throat * 3 : num_nondig] = mpn_throat_conns_col_0
+
     cols[num_nondig:] = mpn_pore__id
 
     coefficients = np.empty(shape=num_total, dtype=np.float64)
-    coefficients[:num_throat] = coefficient_conduction
-    coefficients[num_throat : num_throat * 2] = coefficient_conduction
-    coefficients[num_throat * 2 : num_throat * 3] = coefficient_convection_in
-    coefficients[num_throat * 3 : num_nondig] = coefficient_convection_out
-
-    dig = np.bincount(
-        cols[:num_nondig], weights=coefficients[:num_nondig], minlength=num_pore
+    coefficients[:num_throat] = coefficient_conduction + coefficient_convection_in
+    coefficients[num_throat : num_throat * 2] = (
+        coefficient_conduction + coefficient_convection_out
     )
+
+    dig = np.zeros(shape=num_pore, dtype=np.float64)
+    add_at(arr=dig, indices=cols[:num_nondig], values=coefficients[:num_nondig])
     dig -= convention_fluid
 
     b = np.zeros(shape=num_pore, dtype=np.float64)
@@ -310,9 +307,11 @@ def two_phase_steady_convection_algorithm2(
             pass
 
     coefficients[num_nondig:] = -dig
-
+    nonzero_mask = coefficients != 0
     coefficients_adjacency_matrix = csr_array(
-        (coefficients, (rows, cols)), shape=(num_pore, num_pore), dtype=np.float64
+        (coefficients[nonzero_mask], (rows[nonzero_mask], cols[nonzero_mask])),
+        shape=(num_pore, num_pore),
+        dtype=np.float64,
     )
     # dig += 1e-20
     Tem_c = spsolve(coefficients_adjacency_matrix, b)

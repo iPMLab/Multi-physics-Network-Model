@@ -5,11 +5,13 @@ Created on Thu Apr 14 17:00:02 2022
 
 @author: htmt
 """
+
 import numpy as np
 import pandas as pd
 from xml.etree import ElementTree as ET
-import logging
-from typing import Union, Literal, Optional, Any
+import warnings
+
+from typing import Union, Literal, Optional, Any, List
 import copy
 import itertools
 from pathlib import Path
@@ -17,17 +19,23 @@ from collections import defaultdict
 import re
 from functools import partial
 from ..topotool import trim_pore
-from ..util import is_inplace
+from ..util import is_inplace, to_list
 from ._classical_pn_keys import Pore1_names, Pore2_names, Throat1_names, Throat2_names
 
-logger = logging.getLogger(__name__)
 
 type_mpn = dict
 type_str = Union[str, Path]
 
 
+def coordination_number(mpn: type_mpn):
+    pore_conns = np.bincount(
+        mpn["throat.conns"].reshape(-1), minlength=mpn["pore.all"].size
+    )
+    return pore_conns
+
+
 def load_Statoil(path: type_str, name: type_str = None, prefix: type_str = None):
-    name = name if name != None else prefix
+    name = prefix if name is None else name
     Path_mpnm = Path(path)
     Path_node1 = Path_mpnm / f"{name}_node1.dat"
     Path_node2 = Path_mpnm / f"{name}_node2.dat"
@@ -93,17 +101,19 @@ def dfs2pn(
     throat_conns_pore_1 = mpn["throat.conns"][:, 1]
     inThroats = throat_conns_pore_0 == -2
     outThroats = throat_conns_pore_0 == -1
+    throat_inlets = inThroats.nonzero()[0]
+    throat_outlets = outThroats.nonzero()[0]
     mpn["throat._id"] = np.arange(num_throat)
     mpn["throat.label"] = mpn["throat._id"].copy()
     mpn["throat.all"] = np.ones(num_throat, dtype=bool)
-    mpn["throat.inside"] = ~((inThroats | outThroats).astype(bool))
-    inlets_index = throat_conns_pore_1[inThroats]
+    mpn["throat.inside"] = ~(inThroats | outThroats)
+    pore_inlets = throat_conns_pore_1[inThroats]
     # print(inlets_index)
     mpn["pore.inlets"] = ~mpn["pore.all"]
-    mpn["pore.inlets"][inlets_index] = True
-    outlets_index = throat_conns_pore_1[outThroats]
+    mpn["pore.inlets"][pore_inlets] = True
+    pore_outlets = throat_conns_pore_1[outThroats]
     mpn["pore.outlets"] = ~mpn["pore.all"]
-    mpn["pore.outlets"][outlets_index] = True
+    mpn["pore.outlets"][pore_outlets] = True
     mpn["throat.radius"] = pn_o["throat.radius"]
     mpn["throat.shape_factor"] = pn_o["throat.shape_factor"]
     mpn["throat.length"] = pn_o["throat.length"]
@@ -120,17 +130,17 @@ def dfs2pn(
     if calculate_real_shape_factor:
         BndG1 = np.sqrt(3) / 36 + 0.00001
         BndG2 = 0.07
-        mpn["throat.real_shape_factor"] = mpn["throat.shape_factor"]
+        mpn["throat.real_shape_factor"] = mpn["throat.shape_factor"].copy()
         mpn["throat.real_shape_factor"][
             (mpn["throat.shape_factor"] > BndG1) & (mpn["throat.shape_factor"] <= BndG2)
-        ] = (1 / 16)
+        ] = 1 / 16
         mpn["throat.real_shape_factor"][(mpn["throat.shape_factor"] > BndG2)] = (
             1 / 4 / np.pi
         )
-        mpn["pore.real_shape_factor"] = mpn["pore.shape_factor"]
+        mpn["pore.real_shape_factor"] = mpn["pore.shape_factor"].copy()
         mpn["pore.real_shape_factor"][
             (mpn["pore.shape_factor"] > BndG1) & (mpn["pore.shape_factor"] <= BndG2)
-        ] = (1 / 16)
+        ] = 1 / 16
         mpn["pore.real_shape_factor"][(mpn["pore.shape_factor"] > BndG2)] = (
             1 / 4 / np.pi
         )
@@ -150,8 +160,8 @@ def dfs2pn(
     mpn["pore.area"] = (mpn["pore.radius"] ** 2) / (4.0 * mpn["pore.shape_factor"])
     mpn["pore.solid"] = np.zeros(num_pore, dtype=bool)
     if remove_in_out_throats:
-        throats_trim = np.concatenate((inlets_index, outlets_index), axis=0)
-        mpn = trim_pore(mpn, throats=throats_trim, remove_iso_pore=False)
+        throats_trim = np.concatenate((throat_inlets, throat_outlets))
+        trim_pore(mpn, throats=throats_trim, inplace=True)
     return mpn
 
 
@@ -316,7 +326,7 @@ def read_surface_area(
     Boundaries_areas = pd.read_csv(path, index_col=index_col).to_numpy()
     Boundaries_areas[:, 0] = Boundaries_areas[:, 0] - 1
 
-    max_label = len(mpn["pore.all"]) - 1
+    max_label = mpn["pore.all"].size - 1
 
     Boundaries_areas = Boundaries_areas[Boundaries_areas[:, 0] <= max_label]
     Boundaries_labels = Boundaries_areas[:, 0]
@@ -353,218 +363,235 @@ def read_surface_area(
 
 def getting_zoom_value(
     mpn: type_mpn,
-    side: Literal["x-", "x+", "y-", "y+", "z-", "z+"],
-    imsize,
-    resolution,
-) -> float:
+    sides: Union[
+        Literal["x-", "x+", "y-", "y+", "z-", "z+"],
+        List[Literal["x-", "x+", "y-", "y+", "z-", "z+"]],
+    ],
+    boundary_surfaces: Union[List[str], str],
+    imsize: tuple,
+    resolution: float,
+) -> np.ndarray:
     """
-    calculate the zoom value for the given side
+    Calculate the zoom value(s) for the given side(s).
+
     Parameters
     ----------
-    mpn : type_mpn
-        The network.
-    side : Literal['x-', 'x+', 'y-', 'y+', 'z-', 'z+']
-        The side of the network.
-    imsize : tuple
-        The size of the image.
+    mpn : dict-like
+        The network data containing at least 'pore.radius'.
+    sides : str or list of str
+        Side(s) of the network. One or more of: 'x-', 'x+', 'y-', 'y+', 'z-', 'z+'.
+    boundary_surfaces : str or list of str
+        Corresponding boundary surface label(s) in `mpn`.
+    imsize : tuple of int
+        Image size as (depth, height, width) i.e., (z, y, x).
     resolution : float
-        The resolution of the network.
+        Physical resolution (e.g., meters per voxel).
+
     Returns
     -------
-    float
-        The zoom value for the given side.
+    np.ndarray of float
+        Zoom value(s) for the given side(s).
     """
-    if side in ["x-", "x+"]:
-        value = (
-            imsize[0]
-            * imsize[1]
-            * resolution**2
-            / np.sum(
-                mpn["pore.radius"][mpn["pore.boundary_" + side + "_surface"]] ** 2
-                * np.pi
-            )
-        )
-    elif side in ["y-", "y+"]:
-        value = (
-            imsize[0]
-            * imsize[2]
-            * resolution**2
-            / np.sum(
-                mpn["pore.radius"][mpn["pore.boundary_" + side + "_surface"]] ** 2
-                * np.pi
-            )
-        )
-    elif side in ["z-", "z+"]:
-        value = (
-            imsize[1]
-            * imsize[2]
-            * resolution**2
-            / np.sum(
-                mpn["pore.radius"][mpn["pore.boundary_" + side + "_surface"]] ** 2
-                * np.pi
-            )
-        )
-    else:
-        raise ValueError("Wrong side name")
-    return value
 
-
-def get_program_parameters(path: type_str):
-    import argparse
-
-    description = "Read a VTK XML PolyData file."
-    epilogue = """"""
-    parser = argparse.ArgumentParser(
-        description=description,
-        epilog=epilogue,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+    imsize_arr = np.asarray(imsize)
+    assert imsize_arr.size == 3 and np.issubdtype(imsize_arr.dtype, np.integer), (
+        "imsize must be a 3-tuple of integers"
     )
-    parser.add_argument("--filename", default=path)
-    args = parser.parse_args()
-    return args.filename
+
+    sides_list = to_list(sides)
+    boundary_surfaces_list = to_list(boundary_surfaces)
+
+    assert len(boundary_surfaces_list) == len(sides_list), (
+        f"Length of boundary_surfaces ({len(boundary_surfaces_list)}) "
+        f"must match length of sides ({len(sides_list)})"
+    )
+
+    imsize_dict = {"z": imsize_arr[0], "y": imsize_arr[1], "x": imsize_arr[2]}
+    physical_size = {k: v * resolution for k, v in imsize_dict.items()}
+
+    axis_from_side = {side: side[0] for side in sides_list}  # first char is axis
+
+    zoom_values = []
+    for side, bnd in zip(sides_list, boundary_surfaces_list):
+        axis = axis_from_side[side]
+
+        area_real = np.prod([physical_size[k] for k in physical_size if k != axis])
+
+        radii = mpn["pore.radius"][mpn[bnd]]
+        total_pore_area = np.sum(radii**2 * np.pi)
+
+        zoom = area_real / total_pore_area
+        zoom_values.append(zoom)
+
+    return np.array(zoom_values, dtype=np.float64)
 
 
-def vtk2network(path: str, keep_label: bool = False) -> dict:
-    """
-    Read a VTK XML PolyData file and convert it to a network dictionary.
+def get_dtype(
+    dtype,
+    target: Literal["numpy", "vtk"],
+    _cache={},
+):
+    # _np_vtk = {
+    #     numpy.uint8: vtkConstants.VTK_UNSIGNED_CHAR,
+    #     numpy.uint16: vtkConstants.VTK_UNSIGNED_SHORT,
+    #     numpy.uint32: vtkConstants.VTK_UNSIGNED_INT,
+    #     numpy.uint64: vtkConstants.VTK_UNSIGNED_LONG_LONG,
+    #     numpy.int8: vtkConstants.VTK_SIGNED_CHAR,
+    #     numpy.int16: vtkConstants.VTK_SHORT,
+    #     numpy.int32: vtkConstants.VTK_INT,
+    #     numpy.int64: vtkConstants.VTK_LONG_LONG,
+    #     numpy.float32: vtkConstants.VTK_FLOAT,
+    #     numpy.float64: vtkConstants.VTK_DOUBLE,
+    #     numpy.complex64: vtkConstants.VTK_FLOAT,
+    #     numpy.complex128: vtkConstants.VTK_DOUBLE,
+    # }
+    if not _cache:
+        dtype_map_vtk = {
+            np.dtype("bool_"): "Int8",
+            # np.dtype("u1"): "UInt8",
+            np.dtype("uint8"): "UInt8",
+            np.dtype("uint16"): "UInt16",
+            np.dtype("uint32"): "UInt32",
+            np.dtype("uint64"): "UInt64",
+            np.dtype("int16"): "Int16",
+            np.dtype("int32"): "Int32",
+            np.dtype("int64"): "Int64",
+            np.dtype("float32"): "Float32",
+            np.dtype("float64"): "Float64",
+        }
+        dtype_map_numpy = {v: k for k, v in dtype_map_vtk.items()}
+        _cache.update(vtk=dtype_map_vtk, numpy=dtype_map_numpy)
 
-    Parameters
-    ----------
-    path : str
-        The path of the VTK XML PolyData file.
-    keep_label : bool, optional
-        Whether to keep the original label prefixes, by default False.
-        If False, labels will be converted to boolean arrays.
-
-    Returns
-    -------
-    dict
-        A dictionary containing network data with keys like 'pore.coords',
-        'throat.conns', and other extracted properties.
-    """
-    get_dtype_numpy = partial(get_dtype, target="numpy")
-    path_vtk = Path(path)
-    root = ET.parse(path_vtk)
-    mpn = {}
-
-    # Precompile regex patterns for better performance
-    LABEL_PATTERN = re.compile(r"^(.*?)(pore\.|throat\.)(.*)$")
-
-    def find_nodes_by_tags(root, tags):
-        """Find all nodes with specified tags and return as a dictionary."""
-        result = defaultdict(list)
-        for node in root.iter():
-            if node.tag in tags:
-                result[node.tag].append(node)
+    if target.lower() == "vtk":
+        if not isinstance(dtype, np.dtype):
+            dtype = np.dtype(dtype)
+        result = _cache["vtk"].get(dtype)
+        assert result is not None, (
+            f"Unsupported NumPy dtype: {dtype}. Supported: {list(_cache['vtk'].keys())}"
+        )
         return result
 
-    # Find relevant nodes in the VTK file
-    nodes_dict = find_nodes_by_tags(
-        root, {"Points", "Lines", "PointData", "CellData", "Cells"}
-    )
-
-    # Process data arrays (PointData and CellData)
-    for data_node in itertools.chain(nodes_dict["PointData"], nodes_dict["CellData"]):
-        for data in data_node:
-            attrib = data.attrib
-            name = attrib.get("Name", "Unknown_Name")
-            dtype = get_dtype_numpy(attrib["type"])
-            array = np.fromstring(data.text, dtype=dtype, sep=" ")
-
-            # Handle duplicate names by adding suffix
-            if name in mpn:
-                suffix = 1
-                while f"{name}_{suffix}" in mpn:
-                    suffix += 1
-                name = f"{name}_{suffix}"
-
-            mpn[name] = array
-
-    # Process points (coordinates)
-    if "Points" in nodes_dict:
-        points = nodes_dict["Points"][0][0]  # Assuming single Points node
-        attrib = points.attrib
-        coords = np.fromstring(
-            points.text, dtype=get_dtype_numpy(attrib["type"]), sep=" "
+    elif target.lower() == "numpy":
+        result = _cache["numpy"].get(dtype)
+        assert result is not None, (
+            f"Unsupported VTK dtype: {dtype}. Supported: {list(_cache['numpy'].keys())}"
         )
-        mpn["pore.coords"] = coords.reshape((3, -1), order="F").T
+        return result
 
-    # Process connections (Lines or Cells)
-    for conn_node in itertools.chain(nodes_dict["Lines"], nodes_dict["Cells"]):
-        for conn in conn_node:
-            if conn.attrib.get("Name") == "connectivity":
-                conns = np.fromstring(
-                    conn.text, dtype=get_dtype_numpy(conn.attrib["type"]), sep=" "
-                )
-                if len(conns) % 2 == 0:
-                    mpn["throat.conns"] = conns.reshape((-1, 2))
-                else:
-                    mpn["throat.conns"] = conns
-                    print("Warning: connectivity array has odd length, skip reshaping")
-
-    # Process labels and key names
-    for key in list(mpn.keys()):
-        match = LABEL_PATTERN.match(key)
-        if not match:
-            print(f"Warning: Cannot find pore or throat prefix for {key}, skipping")
-            continue
-
-        prefix, label_type, prop_name = match.groups()
-
-        # Convert label arrays to boolean
-        if "label" in prefix.lower():
-            mpn[key] = mpn[key].astype(bool)
-
-        # Rename keys if not keeping original labels
-        if not keep_label:
-            new_key = f"{label_type}{prop_name}"
-            mpn[new_key] = mpn.pop(key)
-
-    return mpn
-
-
-def get_dtype(dtype, target: Literal["numpy", "VTK"]):
-    # Create a mapping between numpy and VTK dtypes
-    if not hasattr(get_dtype, "dtype_map_VTK") or not hasattr(get_dtype, "dtype_numpy"):
-        get_dtype.dtype_map_VTK = {
-            np.dtype("bool_"): "Bit",
-            # np.dtype("bool_"): "In8",
-            np.dtype("i1"): "Int8",
-            np.dtype("i2"): "Int16",
-            np.dtype("i4"): "Int32",
-            np.dtype("i8"): "Int64",
-            np.dtype("u1"): "UInt8",
-            np.dtype("u2"): "UInt16",
-            np.dtype("u4"): "UInt32",
-            np.dtype("u8"): "UInt64",
-            np.dtype("f4"): "Float32",
-            np.dtype("f8"): "Float64",
-        }
-        get_dtype.dtype_numpy = {
-            value: key for key, value in get_dtype.dtype_map_VTK.items()
-        }
-
-    if target == "VTK":
-        dtype_map_VTK = get_dtype.dtype_map_VTK
-        dtype_VTK = dtype_map_VTK.get(dtype, None)
-        if dtype_VTK is None:
-            raise ValueError(
-                f"Unsupported dtype: {dtype} , dtype should be one of {list(dtype_map_VTK.keys())}"
-            )
-        return dtype_VTK
-    elif target == "numpy":
-        dtype_map_numpy = get_dtype.dtype_numpy
-        dtype_numpy = dtype_map_numpy.get(dtype, None)
-        if dtype_numpy is None:
-            raise ValueError(
-                f"Unsupported dtype: {dtype} , dtype should be one of {list(dtype_map_numpy.values())}"
-            )
-        return dtype_numpy
     else:
         raise ValueError(f"Unsupported target: {target}")
 
 
-logger = logging.getLogger(__name__)
+def vtk2network(path: str, keep_label: bool = False) -> dict:
+
+    root = ET.parse(Path(path)).getroot()
+    mpn = {}
+
+    def extract_data_arrays(da):
+        """Extract all DataArray under PointData or CellData."""
+        name = da.get("Name", "Unknown")
+        dtype = get_dtype(da.get("type"), target="numpy")
+        arr = np.fromstring(da.text, dtype=dtype, sep=" ")
+        return name, arr
+
+    node_map = {
+        p.tag: c.tag
+        for p, c in zip(root.findall(".//DataArray/.."), root.findall(".//DataArray"))
+    }
+    node_map = {"PointData": [], "CellData": [], "Points": [], "Cells": [], "Lines": []}
+
+    da_parents = root.findall(".//DataArray/..")
+    da_names_counts = defaultdict(int)
+    for da_parent in da_parents:
+        for da in da_parent.findall("DataArray"):
+            da_name = da.get("Name", "Unknown")
+            if da_names_counts[da_name] > 0:
+                da.set("Name", f"{da_name}_{da_names_counts[da_name]}")
+            da_names_counts[da_name] += 1
+            node_map[da_parent.tag].append(da)
+
+    node_map["Lines"].extend(node_map.pop("Cells"))
+
+    # --- Process PointData (pore properties) ---
+    for da in node_map["PointData"]:
+        name, arr = extract_data_arrays(da)
+        if name not in mpn:
+            mpn[name] = arr
+        else:
+            warnings.warn(
+                f"Multiple {name} found, keeping the first one. Node tag: {da.tag}",
+                category=UserWarning,
+                stacklevel=1,
+            )
+
+    # --- Process CellData (throat properties) ---
+    for da in node_map["CellData"]:
+        name, arr = extract_data_arrays(da)
+        if name not in mpn:
+            mpn[name] = arr
+        else:
+            warnings.warn(
+                f"Multiple {name} found, keeping the first one. Node tag: {da.tag}",
+                category=UserWarning,
+                stacklevel=1,
+            )
+            mpn[name] = arr
+
+    # --- Process Points (coordinates) ---
+    for da in node_map["Points"]:
+        name, arr = extract_data_arrays(da)
+        arr = np.ascontiguousarray(arr.reshape((-1, 3)))
+        if "pore.coords" not in mpn:
+            mpn["pore.coords"] = arr
+        else:
+            warnings.warn(
+                f"Multiple pore.coords found, keeping the first one. Node tag: {da.tag}",
+                category=UserWarning,
+                stacklevel=1,
+            )
+
+    # --- Process Lines (connections) ---
+    for da in node_map["Lines"]:
+        name = da.get("Name", "Unknown")
+        if name == "connectivity":
+            name, arr = extract_data_arrays(da)
+            if arr.size % 2 == 0:
+                mpn["throat.conns"] = np.ascontiguousarray(arr.reshape((-1, 2)))
+            else:
+                warnings.warn(
+                    "Connectivity array has odd length; skip reshaping",
+                    category=UserWarning,
+                    stacklevel=1,
+                )
+                mpn["throat.conns"] = arr
+
+    # --- Rename keys and process labels ---
+    LABEL_PATTERN = re.compile(r"^(.*?)(pore\.|throat\.)(.*)$")
+    new_mpn = {}
+    mpn_names_counts = defaultdict(int)
+    for key, value in mpn.items():
+        match = LABEL_PATTERN.match(key)
+        if not match:
+            print(
+                f"Warning: Cannot parse key '{key}', make sure the name of DataArray "
+                "is in the format 'pore.prop_name' or 'throat.prop_name', skipping"
+            )
+            continue
+
+        prefix, label_type, prop_name = match.groups()
+        new_key = f"{label_type}{prop_name}" if not keep_label else key
+
+        # Convert label arrays to boolean
+        # if "label" in prefix.lower():
+        #     value = value.astype(bool)
+
+        # Handle duplicate keys
+        if mpn_names_counts[new_key] > 0:
+            new_key = f"{new_key}_{mpn_names_counts[new_key]}"
+        mpn_names_counts[new_key] += 1
+
+        new_mpn[new_key] = value
+    return new_mpn
 
 
 def array_to_element(name: str, array: np.ndarray, n: int = 1) -> ET.Element:
@@ -586,12 +613,13 @@ def array_to_element(name: str, array: np.ndarray, n: int = 1) -> ET.Element:
         The constructed VTK DataArray element.
     """
     array = np.ascontiguousarray(array)
-    dtype_vtk = get_dtype(array.dtype, target="VTK")
-
-    # Handle boolean arrays (convert to uint8)
-    if dtype_vtk == "Bit":
-        array = array.astype(np.uint8)
-        dtype_vtk = "Int8"
+    assert array.dtype != np.int8, (
+        f"Array '{name}' has dtype int8, which is reserved for boolean data (True/False). "
+        "Please use another integer dtype (e.g., uint8, int16 ...) for non-boolean integers."
+    )
+    dtype_vtk = get_dtype(array.dtype, target="vtk")
+    if dtype_vtk == "Int8":
+        array = array.view(np.int8)
 
     element = ET.Element(
         "DataArray", {"Name": name, "NumberOfComponents": str(n), "type": dtype_vtk}
@@ -606,8 +634,10 @@ def network2vtk(
     mpn: type_mpn[str, Any],
     filename: str = "test.vtp",
     network_name: str = "mpnm",
-    fill_nans: Optional[float] = None,
-    fill_infs: Optional[float] = None,
+    nan: Optional[float] = None,
+    posinf: Optional[float] = None,
+    neginf: Optional[float] = None,
+    keys_ignore: Optional[List[str]] = None,
 ) -> None:
     """
     Convert network dictionary to VTK PolyData XML file.
@@ -626,6 +656,11 @@ def network2vtk(
         Value to replace infinities with (default: None, skip arrays with infinities).
     """
     # Setup output file path
+    _keys_ignore = ["properties", "inner_info", "inner_start2end"]
+    if keys_ignore is not None:
+        _keys_ignore.extend(keys_ignore)
+    keys_ignore = set(_keys_ignore)
+
     filename = Path(filename)
     if filename.suffix != ".vtp":
         filename = filename.with_name(filename.name + ".vtp")
@@ -641,11 +676,7 @@ def network2vtk(
     num_throats = pairs.shape[0]
 
     # Filter out special keys
-    filtered_keys = [
-        k
-        for k in mpn.keys()
-        if k not in {"properties", "inner_info", "inner_start2end"}
-    ]
+    filtered_keys = [k for k in mpn.keys() if k not in keys_ignore]
 
     # Create VTK document structure
     root = ET.Element(
@@ -661,14 +692,15 @@ def network2vtk(
 
     # Add points data
     points_node = ET.SubElement(piece, "Points")
-    points_node.append(array_to_element("coords", points.T.ravel("F"), n=3))
+    points_node.append(array_to_element("coords", points.T.reshape(-1, order="F"), n=3))
 
     # Add lines/connections data
     lines_node = ET.SubElement(piece, "Lines")
     lines_node.append(array_to_element("connectivity", pairs))
     lines_node.append(
         array_to_element(
-            "offsets", np.arange(start=2, stop=num_throats * 2 + 2, step=2)
+            "offsets",
+            np.arange(start=2, stop=num_throats * 2 + 2, step=2, dtype=pairs.dtype),
         )
     )
 
@@ -676,44 +708,64 @@ def network2vtk(
     point_data = ET.SubElement(piece, "PointData")
     cell_data = ET.SubElement(piece, "CellData")
 
-    # Process remaining network properties
+    # Sort keys
+    sorted_items = []
     for key in filtered_keys:
+        prop_type = (
+            "label" if np.isdtype(mpn[key].dtype, np.dtype("bool")) else "properties"
+        )
+        vtk_key = f"{network_name} | network | {prop_type} || {key}"
+        sorted_items.append((vtk_key, key))
+
+    sorted_items.sort()
+
+    # Process remaining network properties
+    for vtk_key, key in sorted_items:
         array = mpn[key]
 
         # Skip object arrays
         if array.dtype == object:
-            logger.warning(f"{key} has dtype object and will not be written to file")
+            warnings.warning(
+                f"{key} has dtype object and will not be written to file",
+                category=UserWarning,
+                stacklevel=1,
+            )
             continue
 
         # Determine property type and format key
-        prop_type = "label" if array.dtype == bool else "properties"
-        vtk_key = f"{network_name} | network | {prop_type} || {key}"
-
-        # Handle NaN and Inf values
-        if np.isnan(array.sum()):
-            if fill_nans is None:
-                logger.warning(f"{key} contains NaNs and will not be written to file")
-                continue
-            array[np.isnan(array)] = fill_nans
-
-        if np.isinf(array.sum()):
-            if fill_infs is None:
-                logger.warning(
-                    f"{key} contains infinities and will not be written to file"
-                )
-                continue
-            array[np.isinf(array)] = fill_infs
+        if nan is not None:
+            array[np.isnan(array)] = nan
+        if posinf is not None:
+            array[np.isposinf(array)] = posinf
+        if neginf is not None:
+            array[np.isneginf(array)] = neginf
 
         # Create element and add to appropriate section
         element = array_to_element(vtk_key, array)
 
-        if array.size == num_points:
-            point_data.append(element)
-        elif array.size == num_throats:
-            cell_data.append(element)
+        if key.startswith("pore."):
+            if array.size == num_points:
+                point_data.append(element)
+            else:
+                warnings.warning(
+                    f"{key} has incorrect size ({array.size}), expected num_pores = {num_points}, will not be written to file",
+                    category=UserWarning,
+                    stacklevel=1,
+                )
+        elif key.startswith("throat."):
+            if array.size == num_throats:
+                cell_data.append(element)
+            else:
+                warnings.warning(
+                    f"{key} has incorrect size ({array.size}), expected num_throats = {num_throats}, will not be written to file",
+                    category=UserWarning,
+                    stacklevel=1,
+                )
         else:
-            logger.warning(
-                f"{key} has incorrect size ({array.size}) and will not be written to file"
+            warnings.warning(
+                f"{key} is not started with 'pore.' or 'throat.' and will not be written to file",
+                category=UserWarning,
+                stacklevel=1,
             )
 
     # Write to file with proper formatting

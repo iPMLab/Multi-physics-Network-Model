@@ -4,13 +4,22 @@ import os
 import numba as nb
 import copy
 from contextlib import contextmanager
+from sparse_dot_mkl import mkl_set_num_threads_local, mkl_set_num_threads
 from ._utils_numba import (
     nb_remap,
     # nb_unique_uint,
     nb_isin,
     nb_unravel_index,
+    nb_atomic_add,
+    nb_atomic_sub,
+    nb_atomic_max,
+    nb_atomic_min,
+    nb_voxelise_spheres,
+    nb_voxelise,
     nb_add_at,
-    nb_get_image_from_coords,
+    nb_sub_at,
+    nb_max_at,
+    nb_min_at,
 )
 
 
@@ -26,7 +35,7 @@ def check_mpn(mpn, keys_in_mpn=None):
     if not mpn["throat.conns"].flags["C_CONTIGUOUS"]:
         mpn["throat.conns"] = np.ascontiguousarray(mpn["throat.conns"])
         print(
-            "Warning: 'throat.conns' array is not C contiguous. Converted to C contiguous.\nTo avoid this warning, ensure 'throat.conns' is C contiguous before passing to the function."
+            "Warning: 'throat.conns' array is not C contiguous, converting to C contiguous."
         )
     if "pore.void" not in mpn:
         mpn["pore.void"] = ~mpn["pore.all"].copy()
@@ -34,23 +43,6 @@ def check_mpn(mpn, keys_in_mpn=None):
         mpn["pore.solid"] = ~mpn["pore.all"].copy()
 
     return mpn
-
-
-@contextmanager
-def nb_threads(n_workers=None):
-    # 保存初始线程数
-    initial_threads = nb.get_num_threads()
-    if n_workers is None:
-        n_workers = initial_threads
-    elif n_workers < 0:
-        n_workers = os.cpu_count() + n_workers + 1
-    nb.set_num_threads(n_workers)
-    try:
-        # 执行 with 语句体的代码
-        yield
-    finally:
-        # 恢复初始线程数
-        nb.set_num_threads(initial_threads)
 
 
 def is_inplace(mpn, inplace: bool):
@@ -74,6 +66,13 @@ def is_inplace(mpn, inplace: bool):
     return mpn
 
 
+def to_list(x):
+    if isinstance(x, str):
+        return [x]
+    else:
+        return list(x)
+
+
 def set_num_threads(num_threads, numba=True, numexpr=True, mkl=True, openmp=True):
     num_threads = round(num_threads)
     if num_threads < 0:
@@ -84,6 +83,8 @@ def set_num_threads(num_threads, numba=True, numexpr=True, mkl=True, openmp=True
         os.environ["NUMEXPR_NUM_THREADS"] = str(num_threads)
     if mkl:
         os.environ["MKL_NUM_THREADS"] = str(num_threads)
+        # mkl_set_num_threads_local(num_threads)
+        mkl_set_num_threads(num_threads)
     if openmp:
         os.environ["OMP_NUM_THREADS"] = str(num_threads)
 
@@ -139,47 +140,21 @@ def pd_col_loc(df: pd.DataFrame, col_name):
 
 
 def unique_uint(
-    arr,
-    return_index=False,
-    return_counts=False,
-    equal_nan=False,
-    zero=True,
+    arr, return_index=False, return_counts=False, equal_nan=True, zero=True
 ):
-    arr = np.asarray(arr).reshape(-1)
+    arr = np.reshape(arr, -1)
+    arr = arr[arr >= 0] if zero else arr[arr > 0]
     res = np.unique(
-        arr,
-        return_index=return_index,
-        return_counts=return_counts,
-        equal_nan=equal_nan,
+        arr, return_index=return_index, return_counts=return_counts, equal_nan=equal_nan
     )
-
-    # 处理返回结果
-    if not return_index and not return_counts:
-        unique_values = res
-        mask = unique_values >= 0 if zero else unique_values > 0
-        return unique_values[mask]
-
-    unique_values = res[0]
-    mask = unique_values >= 0 if zero else unique_values > 0
-    filtered_unique = unique_values[mask]
-
-    # 构建返回元组
-    result = [filtered_unique]
-    idx = 1
-    if return_index:
-        result.append(res[idx][mask])
-        idx += 1
-    if return_counts:
-        result.append(res[idx][mask])
-
-    return tuple(result) if len(result) > 1 else result[0]
+    return res
 
 
 def unique_uint_nonzero(
     arr,
     return_index=False,
     return_counts=False,
-    equal_nan=False,
+    equal_nan=True,
 ):
     return unique_uint(
         arr,
@@ -341,12 +316,12 @@ def find_throat_conns_map(mpn_0_throat_conns, mpn_1_throat_conns, unordered_row=
     return throat_conns_map
 
 
-def get_image_from_coords(
+def voxelize_spheres(
     x,
     y,
     z,
     r,
-    resoltion,
+    resolution,
     image_size_x,
     image_size_y,
     image_size_z,
@@ -367,7 +342,7 @@ def get_image_from_coords(
         The z-coordinates of the points.
     r : array_like
         The radius of the points.
-    resoltion : float
+    resolution : float
         The resolution of the image.
     image_size_x : int
         The size of the image in the x-direction.
@@ -391,14 +366,150 @@ def get_image_from_coords(
     z = np.asarray(z).reshape(-1)
     r = np.asarray(r).reshape(-1)
     assert x.size == y.size == z.size, "x, y, z should have the same size"
-    x = (x + offset_x) / resoltion
-    y = (y + offset_y) / resoltion
-    z = (z + offset_z) / resoltion
-    r = r / resoltion
-    image = nb_get_image_from_coords(
-        x, y, z, r, image_size_x, image_size_y, image_size_z
+    x = (x + offset_x) / resolution
+    y = (y + offset_y) / resolution
+    z = (z + offset_z) / resolution
+    r = r / resolution
+    image = nb_voxelise_spheres(
+        x=x,
+        y=y,
+        z=z,
+        r=r,
+        nx=image_size_x,
+        ny=image_size_y,
+        nz=image_size_z,
     )
     return image
+
+
+def voxelize_particles(
+    cube_x,
+    cube_y,
+    cube_z,
+    verts,
+    faces,
+    positions,
+    rotations=None,
+    resolution=1.0,
+    ray_directions="x",
+    verbose=False,
+    dtype=np.float32,
+):
+    """
+    Voxelizes multiple instances of the same mesh at different positions/rotations.
+
+    Parameters:
+        cube_x, cube_y, cube_z: physical size of global cube in x-direction, y-direction, z-direction
+        verts: (V, 3) original mesh vertices
+        faces: (F, 3) face indices
+        positions:   (P, 3) list of particle centers
+        rotations:   (P, 3, 3) or None
+        x, y, z: size of global grid in each direction
+        resolution: resolution of global voxel grid
+        ray_directions: 'x', 'y', 'z', or 'xyz'
+    Returns:
+        global_voxel: (nx, ny, nz) boolean array
+    """
+
+    positions = np.asarray(positions)
+    assert len(positions.shape) == 2, (
+        f"positions must be (num_particles, 3), got {positions.shape}"
+    )
+    num_particles = positions.shape[0]
+    if rotations is not None:
+        rotations = np.asarray(rotations)
+        if rotations.shape == (3, 3):
+            rotations = np.broadcast_to(rotations, (num_particles, 3, 3))
+        assert rotations.shape == (num_particles, 3, 3), (
+            f"rotations shape must be (num_particles, 3, 3), got {rotations.shape}"
+        )
+    else:
+        rotations = np.empty((1, 1, 1), dtype=dtype)
+        rotations = np.broadcast_to(rotations, (num_particles, 1, 1))
+
+    nz = int(cube_z / resolution)
+    ny = int(cube_y / resolution)
+    nx = int(cube_x / resolution)
+
+    if verbose:
+        print(f"resolution: {resolution}, nx: {nx}, ny: {ny}, nz: {nz}")
+
+    # Build base particle vertices once
+    tri_verts = verts[faces]
+    tri_verts /= resolution
+    # mesh = pv.PolyData(verts / resolution, np.insert(faces, 0, 3, axis=1).reshape(-1))
+    # mesh.plot()
+    positions /= resolution
+
+    tri_verts = tri_verts.astype(dtype, copy=False)
+    positions = positions.astype(dtype, copy=False)
+    rotations = rotations.astype(dtype, copy=False)
+
+    results = []
+    for ray_direction in ray_directions:
+        if ray_direction == "x":
+            grid_x = np.zeros((nz, ny, nx), dtype=np.bool_)
+            tri_verts = np.ascontiguousarray(tri_verts)
+            grid_x = nb_voxelise(grid_x, tri_verts, positions, rotations)
+            results.append(grid_x)
+        elif ray_direction == "y":
+            # Swap x and y in vertices: (x,y,z) -> (y,x,z)
+            tri_verts_y = tri_verts.copy()
+            tri_verts_y[:, :, [0, 1]] = tri_verts_y[:, :, [1, 0]]
+            tri_verts_y = np.ascontiguousarray(tri_verts_y)
+
+            positions_y = positions.copy()
+            positions_y[:, [0, 1]] = positions_y[:, [1, 0]]  # swap x and y
+            positions_y = np.ascontiguousarray(positions_y)
+
+            if rotations[0].size > 1:  # (N, 3, 3)
+                P = np.array([[0, 1, 0], [1, 0, 0], [0, 0, 1]], dtype=rotations.dtype)
+                rotations_y = P @ rotations @ P.T
+            else:
+                rotations_y = rotations  # scalar or (3,3)
+
+            grid_y = np.zeros((nz, nx, ny), dtype=np.bool_)
+            grid_y = nb_voxelise(grid_y, tri_verts_y, positions_y, rotations_y)
+            grid_y = np.ascontiguousarray(grid_y.transpose(0, 2, 1))
+
+            results.append(grid_y)
+        elif ray_direction == "z":
+            # Swap x and z: (x,y,z) -> (z,y,x)
+            tri_verts_z = tri_verts.copy()
+            tri_verts_z[:, :, [0, 2]] = tri_verts_z[:, :, [2, 0]]
+            tri_verts_z = np.ascontiguousarray(tri_verts_z)
+
+            positions_z = positions.copy()
+            positions_z[:, [0, 2]] = positions_z[:, [2, 0]]  # swap x and z
+            positions_z = np.ascontiguousarray(positions_z)
+
+            if rotations[0].size > 1:
+                P = np.array(
+                    [[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=rotations.dtype
+                )  # shape (3, 3)
+                rotations_z = P @ rotations @ P.T
+            else:
+                rotations_z = rotations
+
+            grid_z = np.zeros((nx, ny, nz), dtype=np.bool_)
+            grid_z = nb_voxelise(grid_z, tri_verts_z, positions_z, rotations_z)
+            grid_z = np.ascontiguousarray(grid_z.transpose(2, 1, 0))
+            results.append(grid_z)
+
+        else:
+            raise ValueError(
+                f"ray_directions must be 'x', 'y', or 'z', got {ray_directions}"
+            )
+    num_grid = len(results)
+    if num_grid == 1:
+        grid_out = results[0]
+    else:
+        grid_out = np.zeros((nz, ny, nx), dtype=np.uint8)
+        for grid in results:
+            grid_out += grid
+        grid_out = grid_out > 0
+
+    return grid_out
 
 
 def ravel(arr):
@@ -427,10 +538,44 @@ def dfs2df(dfs, subset="ids", keep="first"):
     return df
 
 
-def add_at(arr, indices, values, inplace=True):
-    if not inplace:
-        arr = arr.copy()
-    nb_add_at(arr, indices, values)
+def add_at(arr, indices, values, inplace=True, parallel=False):
+    if arr.dtype is not values.dtype:
+        values = values.astype(arr.dtype)
+    if parallel:
+        arr = nb_atomic_add(arr, indices, values, inplace=inplace)
+    else:
+        arr = nb_add_at(arr, indices, values, inplace=inplace)
+
+    return arr
+
+
+def sub_at(arr, indices, values, inplace=True, parallel=False):
+    if arr.dtype is not values.dtype:
+        values = values.astype(arr.dtype)
+    if parallel:
+        arr = nb_atomic_sub(arr, indices, values, inplace=inplace)
+    else:
+        arr = nb_sub_at(arr, indices, values, inplace=inplace)
+    return arr
+
+
+def max_at(arr, indices, values, inplace=True, parallel=False):
+    if arr.dtype is not values.dtype:
+        values = values.astype(arr.dtype)
+    if parallel:
+        arr = nb_atomic_max(arr, indices, values, inplace=inplace)
+    else:
+        arr = nb_max_at(arr, indices, values, inplace=inplace)
+    return arr
+
+
+def min_at(arr, indices, values, inplace=True, parallel=False):
+    if arr.dtype is not values.dtype:
+        values = values.astype(arr.dtype)
+    if parallel:
+        arr = nb_atomic_min(arr, indices, values, inplace=inplace)
+    else:
+        arr = nb_min_at(arr, indices, values, inplace=inplace)
     return arr
 
 
@@ -441,3 +586,84 @@ def keys_in_dict(mpn, keys):
 
 def hash_array(arr):
     return xxhash.xxh3_64_intdigest(arr.data)
+
+
+def randomize_colors(im, keep_vals=[0]):
+    r"""
+    Copied from porespy.tools.randomize_colors
+    -----------
+    Takes a greyscale image and randomly shuffles the greyscale values.
+
+    In other words, all voxels labeled X will be labelled Y, and all voxels
+    labeled Y will be labeled Z, and so on, where X, Y, Z are randomly selected
+    from the values in the input image.
+
+    Parameters
+    ----------
+    im : array_like
+        An ND image of greyscale values.
+    keep_vals : array_like
+        Indicate which voxel values should NOT be altered.  The default is
+        `[0]` which is useful for leaving the background of the image
+        untouched.
+
+    Returns
+    -------
+    image : ndarray
+        An image the same size and type as ``im`` but with the greyscale values
+        reassigned.  The unique values in both the input and output images will
+        be identical.
+
+    Notes
+    -----
+    If the greyscale values in the input image are not contiguous then the
+    neither will they be in the output.
+
+    This function is useful for improving the visibility of images with
+    neighboring regions that are only incrementally different from each other,
+    such as that returned by `scipy.ndimage.label`.
+
+    Examples
+    --------
+    >>> import porespy as ps
+    >>> import numpy as np
+    >>> np.random.seed(0)
+    >>> im = np.random.randint(low=0, high=5, size=[4, 4])
+    >>> print(im)
+    [[4 0 3 3]
+     [3 1 3 2]
+     [4 0 0 4]
+     [2 1 0 1]]
+    >>> im_rand = ps.tools.randomize_colors(im)
+    >>> print(im_rand)
+    [[2 0 4 4]
+     [4 1 4 3]
+     [2 0 0 2]
+     [3 1 0 1]]
+
+    As can be seen, the 2's have become 3, 3's have become 4, and 4's have
+    become 2.  1's remained 1 by random accident.  0's remain zeros by default,
+    but this can be controlled using the `keep_vals` argument.
+
+    Examples
+    --------
+    `Click here
+    <https://porespy.org/examples/tools/reference/randomize_colors.html>`__
+    to view online example.
+
+    """
+    im_flat = im.flatten()
+    keep_vals = np.array(keep_vals)
+    swap_vals = ~np.isin(im_flat, keep_vals)
+    im_vals = np.unique(im_flat[swap_vals])
+    new_vals = np.random.permutation(im_vals)
+    im_map = np.zeros(
+        shape=[
+            np.amax(im_vals) + 1,
+        ],
+        dtype=int,
+    )
+    im_map[im_vals] = new_vals
+    im_new = im_map[im_flat]
+    im_new = np.reshape(im_new, shape=np.shape(im))
+    return im_new

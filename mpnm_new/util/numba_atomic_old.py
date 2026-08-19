@@ -10,6 +10,9 @@ from numba.extending import lower_builtin, type_callable
 from numba.np.arrayobj import basic_indexing, make_array, normalize_indices
 
 __all__ = ["atomic_add", "atomic_sub", "atomic_max", "atomic_min"]
+"""
+https://github.com/KatanaGraph/katana/blob/master/python/katana/native_interfacing/numpy_atomic.py
+"""
 
 
 def atomic_rmw(context, builder, op, arrayty, val, ptr):

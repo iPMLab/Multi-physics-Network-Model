@@ -1,6 +1,7 @@
 import numba as nb
 import numpy as np
 from ..enum import Pore_Types, Throat_Types
+from ..util._PARAM_JIT import PARAM_JIT
 
 none_array = np.array(((-1,),), dtype=np.int64)
 
@@ -9,7 +10,7 @@ Throat_Types_solid = int(Throat_Types.solid)
 Throat_Types_interface = int(Throat_Types.interface)
 
 
-@nb.njit(parallel=False, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=False, **PARAM_JIT)
 def nb_find_neighbor_ball_info(inner_info, inner_start2end, _id):
     if inner_start2end[_id, 0] == -1:
         void = none_array
@@ -41,7 +42,7 @@ def nb_find_neighbor_ball_info(inner_info, inner_start2end, _id):
         return void, solid, interface
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_find_neighbor_ball(mpn_pore_void, mpn_pore_solid, mpn_throat_conns, ids):
     """
     Pore_type 0: void, 1: solid, 2: interface
@@ -85,7 +86,7 @@ def nb_find_neighbor_ball(mpn_pore_void, mpn_pore_solid, mpn_throat_conns, ids):
         return [void, solid, interface]
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_species_balance_conv(
     inner_info,
     inner_start2end,
@@ -156,7 +157,7 @@ def nb_species_balance_conv(
     return result
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_energy_balance_conv(
     inner_info,
     inner_start2end,
@@ -219,7 +220,7 @@ def nb_energy_balance_conv(
     return result  # - inlet + outlet
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_mass_balance_conv(inner_info, inner_start2end, g_ij, P_profile, ids):
     result = np.zeros(ids.size, dtype=np.float64)
     for i in nb.prange(ids.size):
@@ -237,7 +238,7 @@ def nb_mass_balance_conv(inner_info, inner_start2end, g_ij, P_profile, ids):
     return result
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_cal_pore_veloc(
     inner_info, inner_start2end, mpn_pore_radius, g_ij, P_profile, ids
 ):
@@ -284,7 +285,7 @@ def nb_cal_pore_veloc(
     return result
 
 
-@nb.njit(parallel=True, cache=True, fastmath=True, nogil=True, error_model="numpy")
+@nb.njit(parallel=True, **PARAM_JIT)
 def nb_calculate_pore_flux(inner_info, inner_start2end, g_ij, P_profile, ids):
     result = np.zeros(ids.size, dtype=np.float64)
     for i in nb.prange(ids.size):

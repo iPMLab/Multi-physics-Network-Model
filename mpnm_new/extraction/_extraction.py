@@ -20,6 +20,7 @@ from ._extraction_numba import (
     nb_compute_surface_area_voxel,
     nb_get_objects_volume,
     nb_edt,
+    nb_get_throat_types,
 )
 from sparse_dot_mkl import dot_product_mkl
 from ..network import load_Statoil, read_pypne
@@ -36,11 +37,103 @@ from ..util import (
     find_throat_conns_map,
 )
 
+from ._nbpne.extract_util import extract as extract_nbpne
+import time
+from edt import edt
+from typing import Optional, Literal
+from contextlib import nullcontext, redirect_stdout
+import os
+
+# config = {
+#     method: "pne",
+#     target_value: value to extract,
+#     config_pne: see pypne's documentation for details (default None)
+#     pn_mode : Optional[str] "image","origin","origin_image" (default "image")
+#         "image" : pores and throats are extracted from image, without using pnextracted classic pore network
+#         "origin" : using classic pore network
+#         "origin_image" : using classic pore network throat.conns, adjusting pores' properties and throats' properties according to image
+# }
+# if method is snow
+# config = {
+#     method: "snow",
+#     target_value: value to extract,
+#     sigma: float (default 0.4),
+#     r_max: float (default None),
+#     unsegmented_value: int (default -1)
+# }
+# if method is nbpne
+# config = {
+#     method: "nbpne",
+#     target_value: value to extract,
+# }
+
+
+class ConfigExtraction:
+    """Base class for all extraction configs"""
+
+    def collect_kwargs(self):
+        kwargs = {k: v for k, v in self.__dict__.items() if k[0] != "_"}
+        if self.name == "pnec":
+            del kwargs["pn_mode"]
+        return kwargs
+
+
+class ConfigPNEC(ConfigExtraction):
+    name = "pnec"
+
+    def __init__(
+        self,
+        target_value: int,
+        resolution: Optional[float] = None,
+        pn_mode: Literal["image", "origin", "origin_image"] = "image",
+        config_settings: Optional[dict] = None,
+        n_workers: int = 1,
+        verbose: bool = False,
+    ):
+        self.target_value = target_value
+        self.resolution = resolution
+        self.pn_mode = pn_mode
+        self.config_settings = config_settings
+        self.n_workers = n_workers
+        self.verbose = verbose
+
+
+class ConfigSNOW(ConfigExtraction):
+    name = "snow"
+
+    def __init__(
+        self,
+        target_value: int,
+        sigma: float = 0.4,
+        r_max: Optional[float] = None,
+        unsegmented_value: int = -1,
+        compactness: float = 0,
+        n_workers: int = 1,
+    ):
+        self.target_value = target_value
+        self.sigma = sigma
+        self.r_max = r_max
+        self.unsegmented_value = unsegmented_value
+        self.compactness = compactness
+        self.n_workers = n_workers
+
+
+class ConfigPNE(ConfigExtraction):
+    name = "pne"
+
+    def __init__(self, target_value: int, verbose: bool = False):
+        self.target_value = target_value
+        self.verbose = verbose
+
+    # 没有额外字段
+
+
+TIME_COUNTING = {"surface_time": 0.0}
 dirs = ("x-", "x+", "y-", "y+", "z-", "z+")
 
 
-def edt(image, black_border: bool = False, wx=1, wy=1, wz=1):
-    return nb_edt(image, black_border=black_border, wx=wx, wy=wy, wz=wz)
+# def edt(image, black_border: bool = False, wx=1, wy=1, wz=1):
+#     return nb_edt(image, black_border=black_border, wx=wx, wy=wy, wz=wz)
 
 
 def mk_functionals(
@@ -49,13 +142,13 @@ def mk_functionals(
     norm: bool = False,
     return_area: bool = True,
     return_length: bool = True,
-    return_euler4: bool = False,
-    return_euler8: bool = True,
+    # return_euler4: bool = False,
+    # return_euler8: bool = True,
     return_volume: bool = True,
     return_surface: bool = True,
     return_curvature: bool = True,
-    return_euler6: bool = False,
-    return_euler26: bool = True,
+    # return_euler6: bool = False,
+    # return_euler26: bool = True,
 ):
     r"""Compute the Minkowski functionals in 2D or 3D.
     This function computes the Minkowski functionals for the Numpy array `image`. Both
@@ -139,18 +232,18 @@ def mk_functionals(
             resolution = np.repeat(resolution, ndim)
     image = np.ascontiguousarray(image)
     if ndim == 2:
-        area, length, euler4, euler8 = nb_functionals_2d(
+        area, length = nb_functionals_2d(
             image,
             res0=resolution[0],
             res1=resolution[1],
             norm=norm,
             return_area=return_area,
             return_length=return_length,
-            return_euler4=return_euler4,
-            return_euler8=return_euler8,
+            # return_euler4=return_euler4,
+            # return_euler8=return_euler8,
         )
     elif ndim == 3:
-        volume, surface, curvature, euler6, euler26 = nb_functionals_3d(
+        volume, surface, curvature = nb_functionals_3d(
             image,
             res0=resolution[0],
             res1=resolution[1],
@@ -159,8 +252,8 @@ def mk_functionals(
             return_volume=return_volume,
             return_surface=return_surface,
             return_curvature=return_curvature,
-            return_euler6=return_euler6,
-            return_euler26=return_euler26,
+            # return_euler6=return_euler6,
+            # return_euler26=return_euler26,
         )
     else:
         raise ValueError("image must be 2D or 3D")
@@ -170,10 +263,10 @@ def mk_functionals(
             res.append(area)
         if return_length:
             res.append(length)
-        if return_euler4:
-            res.append(euler4)
-        if return_euler8:
-            res.append(euler8)
+        # if return_euler4:
+        #     res.append(euler4)
+        # if return_euler8:
+        #     res.append(euler8)
     if ndim == 3:
         # 3D
         if return_volume:
@@ -182,10 +275,10 @@ def mk_functionals(
             res.append(surface)
         if return_curvature:
             res.append(curvature)
-        if return_euler6:
-            res.append(euler6)
-        if return_euler26:
-            res.append(euler26)
+        # if return_euler6:
+        #     res.append(euler6)
+        # if return_euler26:
+        #     res.append(euler26)
 
     return tuple(res) if len(res) > 1 else res[0]
 
@@ -220,11 +313,10 @@ def check_pnextract_result(img, path, name=None, prefix=None):
     labels_remap = np.arange(1, labels_img.max() + 1, dtype=np.int32)
 
     if np.array_equal(labels_img, labels_remap):
-        print("PNEXTRACT: Image does not need to be modified")
         return img
     else:
         print("PNEXTRACT: Image needs to be modified")
-        img = remap(img, labels_img, labels_remap)
+        img = remap(img, labels_img, labels_remap, inplace=True)
         pores_not_in_img = np.setdiff1d(
             Pores.loc[:, "index"], labels_img, assume_unique=True
         )
@@ -369,12 +461,12 @@ def constrained_smooth(img, band_radius: int = 4, max_iters: int = 500, rel_tol=
 
     num_variables = np.count_nonzero(band)
 
-    variable_indices = np.full_like(band, -1, dtype=np.int32)
+    variable_indices = np.full_like(band, -1, dtype=np.int64)
     variable_indices[band] = np.arange(num_variables)
     # Compute filterq.
     filterq = buildq(variable_indices)
     # Initialize the variables.
-    res = np.asarray(distance, dtype=np.double)
+    res = np.asarray(distance, dtype=np.float32)
     x = res[band]
     upper_bound = np.where(x < 0, x, np.inf)
     lower_bound = np.where(x > 0, x, -np.inf)
@@ -402,7 +494,6 @@ def calculate_surface_area_mk(image):
             return_curvature=False,
             return_surface=True,
             return_volume=False,
-            return_euler26=False,
         )
         * 8
     )
@@ -424,42 +515,18 @@ def calculate_surface_area_voxel(image):
     return area
 
 
-def calculate_surface_area_constrained_smooth(image):
+def calculate_surface_area_constrained_smooth(image, max_iters=500, rel_tol=1e-6):
     import mcubes
 
     # image = constrained_smooth(image)
-    image_ = mcubes.smooth(image, method="constrained", max_iters=int(1e20))
-    area = calculate_surface_area_mc(image_, level=0)
+    image = mcubes.smooth(
+        image, method="constrained", max_iters=max_iters, rel_tol=rel_tol
+    )
+    area = calculate_surface_area_mc(image, level=0)
     return area
 
 
-def calculate_boundary_area(mix_image, Path_dict):
-    """
-    use pnextract order of array
-    """
-    Csvs_dict = Path_dict["Csvs"]
-    labels = np.arange(1, mix_image.max() + 1, dtype=np.int32)
-    boundaries_areas = np.zeros((len(labels), 7), dtype=np.int32)
-    boundaries_areas[:, 0] = labels
-    slice_left = (slice(None), slice(None), slice(0))
-    slice_right = (slice(None), slice(None), slice(-1))
-    slice_front = (slice(None), slice(0), slice(None))
-    slice_back = (slice(None), slice(-1), slice(None))
-    slice_bottom = (slice(0), slice(None), slice(None))
-    slice_top = (slice(-1), slice(None), slice(None))
-    slices = (slice_left, slice_right, slice_front, slice_back, slice_bottom, slice_top)
-    for i, slice_ in enumerate(slices):
-        labels_i, counts_i = unique_uint_nonzero(mix_image[slice_], return_counts=True)
-        boundaries_areas[:, i + 1][np.isin(labels, labels_i)] = counts_i
-    boundaries_areas = pd.DataFrame(
-        boundaries_areas, columns=["label", "x-", "x+", "y-", "y+", "z-", "z+"]
-    )
-    boundaries_areas.to_csv(Csvs_dict["boundaries_areas"])
-
-    return boundaries_areas
-
-
-def calculate_boundary_area2(mix_image):
+def calculate_boundary_area(mix_image):
     """
     use pnextract order of array
     """
@@ -830,36 +897,41 @@ def trim_nearby_peaks(peaks, dt, f=1):
         L[hits] < L[nearest_neighbor[hits]], hits, nearest_neighbor[hits]
     )
     drop_peaks = np.unique(drop_peaks)
-    new_peaks = ~np.isin(labels, drop_peaks + 1, kind="table") * peaks
+    new_peaks = np.isin(labels, drop_peaks + 1, kind="table", invert=True) * peaks
     return new_peaks
 
 
-def snow_image_segmentation(
+def snow_segmentation(
     image: np.ndarray,
     target_value: int = 1,
     sigma: float = 0.4,
     r_max: float = None,
+    compactness: float = 0,
     unsegmented_value: int = -1,
+    n_workers: int = 1,
 ):
     """ """
     image = image == target_value
-    image_inversed = ~image
-    dt_original = edt(image)
-    dt_r_mean = np.mean(dt_original[image])
-    dt_soomthed = spim.gaussian_filter(input=dt_original, sigma=sigma)
-    dt_soomthed[image_inversed] = 0.0
+    dt = edt(image, parallel=n_workers)
+    dt = spim.gaussian_filter(input=dt * image, sigma=sigma)
+    weights = spim.gaussian_filter(image.astype(np.float32), sigma=sigma)
+    weights_bool = weights > 0
+    dt[weights_bool] /= weights[weights_bool]
+    dt *= image
+    dt_r_mean = np.mean(dt[image])
     if r_max is None:
         r_max = np.round(dt_r_mean + 0.5)
-    peaks = find_peaks(dt=dt_soomthed, r_max=r_max)
-    peaks = trim_saddle_points(peaks=peaks, dt=dt_soomthed)
-    peaks = trim_nearby_peaks(peaks=peaks, dt=dt_original)
+        print(f"r_max: {r_max}")
+    peaks = find_peaks(dt=dt, r_max=r_max)
+    peaks = trim_saddle_points(peaks=peaks, dt=dt)
+    peaks = trim_nearby_peaks(peaks=peaks, dt=dt)
     peaks = spim.label(peaks)[0]
     image_VElems = watershed(
-        -dt_soomthed, markers=peaks, mask=image
+        -dt, markers=peaks, mask=image, compactness=compactness
     )  # Watershed algarithm
 
-    labels = unique_uint_nonzero(image_VElems)
-    if np.array_equal(labels, np.arange(1, np.max(labels) + 1, dtype=np.int32)):
+    labels = unique_uint_nonzero(image_VElems).astype(np.int32, copy=False)
+    if np.array_equal(labels, np.arange(1, labels.max() + 1, dtype=np.int32)):
         pass
         # print("SNOW EXTRACTION: all labels are continuous, no need to relabel")
     else:
@@ -870,23 +942,23 @@ def snow_image_segmentation(
     return image_VElems
 
 
-def pnextract(
+def pnec(
     image,
     resolution=1.0,
-    target_value=0,
+    target_value=1,
     n_workers=1,
     verbose=False,
     cut_image=False,
     check_result=False,
-    config_dict=None,
+    config_settings=None,
 ):
     import pypne
 
-    image = (image != target_value).astype(np.uint8, copy=False)
+    image = image == target_value
     image_VElems, pn_pne = pypne.pnextract(
         image,
         resolution,
-        config_settings=config_dict,
+        config_settings=config_settings,
         n_workers=n_workers,
         verbose=verbose,
     )
@@ -932,18 +1004,27 @@ def check_pypne_result(image_VElems, pn_pne):
     return image_VElems, pn_pne
 
 
+def pne_segmentation(image, target_value=1, cut_image=True, verbose=False):
+    image = image == target_value
+    with (
+        nullcontext() if verbose else Path(os.devnull).open("w") as f,
+        redirect_stdout(f),
+    ):
+        image_VElems = extract_nbpne(image).astype(np.int32, copy=False) + 1
+    if cut_image:
+        image_VElems = image_VElems[1:-1, 1:-1, 1:-1]
+    return image_VElems.astype(np.int32, copy=False)
+
+
 def get_objects_volume(labeled_image):
     """
     labeled_image: 3D labeled image, should be continuous and start from 1, 0 is background
     """
-    labels = unique_uint_nonzero(labeled_image)
-    label_min = labels.min()
+    labels = unique_uint_nonzero(labeled_image).astype(np.int32, copy=False)
     label_max = labels.max()
-    assert (
-        np.array_equal(labels, np.arange(label_min, label_max + 1, dtype=np.int32))
-        and label_min == 1
-    ), "Labels are not continuous or not start from 1"
-
+    assert np.array_equal(labels, np.arange(1, label_max + 1, dtype=np.int32)), (
+        "Labels are not continuous or not start from 1"
+    )
     z_min, z_max, y_min, y_max, x_min, x_max, volume = nb_get_objects_volume(
         labeled_image, label_max=label_max
     )
@@ -961,17 +1042,21 @@ def get_objects_volume(labeled_image):
     return phase_props_table
 
 
-# calculate_surface_area_extraction = calculate_surface_area_voxel
-calculate_surface_area_extraction = calculate_surface_area_mc
-# calculate_surface_area_extraction = calculate_surface_area_mk
-
-
 def calculate_pore_properties_from_image(
-    label, labeled_image, phase_props_table, offset=3, pad=2
+    label,
+    labeled_image,
+    phase_props_table,
+    offset=3,
+    pad=2,
+    area_alg: Literal["mk", "mc"] = "mk",
 ):
     """
     label,pore.z,pore.y,pore.x,pore.radius,pore.surface_area,pore.volume
     """
+    if area_alg == "mk":
+        calculate_surface_area = calculate_surface_area_mk
+    else:
+        calculate_surface_area = calculate_surface_area_mc
     result = np.empty(7, dtype=np.float32)
 
     zyx_min_max = get_label_box(label, phase_props_table, offset=offset)
@@ -996,7 +1081,10 @@ def calculate_pore_properties_from_image(
     # Volume i
     volume_i = phase_props_table[label, 6]
     # Surface area i
-    area_i = calculate_surface_area_extraction(region_bool_i)
+    t0 = time.time()
+    area_i = calculate_surface_area(region_bool_i)
+    TIME_COUNTING["surface_time"] += time.time() - t0
+
     result[0] = label
     result[1:4] = center_index[::-1] + 0.5
     result[4] = radius_i
@@ -1016,8 +1104,17 @@ dilate_structure = np.array(
 
 
 def calculate_throat_properties_from_image(
-    label, labeled_image, phase_props_table, offset=3, pad=2
+    label,
+    labeled_image,
+    phase_props_table,
+    offset=3,
+    pad=2,
+    area_alg: Literal["mk", "mc"] = "mk",
 ):
+    if area_alg == "mk":
+        calculate_surface_area = calculate_surface_area_mk
+    else:
+        calculate_surface_area = calculate_surface_area_mc
     zyx_min_max = get_label_box(label, phase_props_table, offset=offset)
     zyx_min = zyx_min_max[0]
     zyx_max = zyx_min_max[1]
@@ -1028,7 +1125,9 @@ def calculate_throat_properties_from_image(
         region, ((pad, pad), (pad, pad), (pad, pad)), mode="constant", constant_values=0
     )
     region_bool_i = region == label
-    area_i = calculate_surface_area_extraction(region_bool_i)
+    t0 = time.time()
+    area_i = calculate_surface_area(region_bool_i)
+    TIME_COUNTING["surface_time"] += time.time() - t0
     # structure = np.ones((3,) * region_bool_i.ndim, dtype=bool)
     region_dilated_bool_i = spim.binary_dilation(
         region_bool_i, structure=dilate_structure
@@ -1042,13 +1141,17 @@ def calculate_throat_properties_from_image(
 
     table = np.empty((num_neighbors, 3), dtype=np.float32)
     for i, neighbor_label in enumerate(neighbor_labels):
-        area_nei = calculate_surface_area_extraction(region == neighbor_label)
-        area_total = calculate_surface_area_extraction(
-            np.isin(region, (label, neighbor_label), kind="table")
-        )
+        region_neighbor_bool = region == neighbor_label
+        t0 = time.time()
+        area_nei = calculate_surface_area(region_neighbor_bool)
+        TIME_COUNTING["surface_time"] += time.time() - t0
+        region_all_bool = np.isin(region, (label, neighbor_label), kind="table")
+        t0 = time.time()
+        area_all = calculate_surface_area(region_all_bool)
+        TIME_COUNTING["surface_time"] += time.time() - t0
         table[i, 0] = label
         table[i, 1] = neighbor_label
-        table[i, 2] = (area_i + area_nei - area_total) / 2
+        table[i, 2] = (area_i + area_nei - area_all) * 0.5
     table = table[table[:, 2] > 0]
     if table.size == 0:
         return np.array((label, -1, -1), dtype=np.int32)
@@ -1056,7 +1159,21 @@ def calculate_throat_properties_from_image(
         return table
 
 
-###############
+def generate_throat_types(N, undirected=True):
+    if undirected:
+        res_throat_conns = np.column_stack(np.triu_indices(N))
+    else:
+        res_throat_conns = np.ascontiguousarray(np.indices((N, N)).reshape(2, -1).T)
+    res_throat_types = np.arange(res_throat_conns.shape[0], dtype=np.int32)
+    return res_throat_conns, res_throat_types
+
+
+def get_throat_types(throat_conns, throat_conns_types, throat_types, sort=False):
+    if sort:
+        throat_conns = np.sort(throat_conns, axis=1, kind="stable")
+    throat_types = throat_types.astype(np.int32, copy=False)
+    res = nb_get_throat_types(throat_conns, throat_conns_types, throat_types)
+    return res
 
 
 def extract_from_image(
@@ -1066,6 +1183,8 @@ def extract_from_image(
     n_workers=1,
     backend="loky",
     seps=None,
+    cubic_boundary_area=True,
+    area_alg: Literal["mk", "mc"] = "mk",
 ):
     """
     labeled_image: 3D labeled image, should be continuous and start from 1, 0 is background
@@ -1074,18 +1193,27 @@ def extract_from_image(
     seps = [1,21,41,61]
     """
 
-    labels = unique_uint_nonzero(labeled_image)
+    labels = unique_uint_nonzero(labeled_image).astype(np.int32, copy=False)
     label_max = labels.max() + 1
-    if np.all(labels != np.arange(1, label_max)):
-        raise ValueError("Labels are not continuous or not start from 1")
+
+    assert np.array_equal(labels, np.arange(1, label_max, dtype=np.int32)), (
+        "Labeled image is not continuous or not start from 1"
+    )
     if seps is None:
-        seps = [1, label_max]
+        seps = np.array([1, label_max])
+    else:
+        seps = np.asarray(seps, dtype=np.int32)
+    num_phases = seps.size - 1
+
     if phase_props_table is None:
         phase_props_table = get_objects_volume(labeled_image)
     pore_props = np.vstack(
         Parallel(n_jobs=n_workers, backend=backend)(
             delayed(calculate_pore_properties_from_image)(
-                label, labeled_image, phase_props_table
+                label=label,
+                labeled_image=labeled_image,
+                phase_props_table=phase_props_table,
+                area_alg=area_alg,
             )
             for label in tqdm(labels)
         )
@@ -1093,11 +1221,15 @@ def extract_from_image(
     throat_props = np.vstack(
         Parallel(n_jobs=n_workers, backend=backend)(
             delayed(calculate_throat_properties_from_image)(
-                label, labeled_image, phase_props_table
+                label=label,
+                labeled_image=labeled_image,
+                phase_props_table=phase_props_table,
+                area_alg=area_alg,
             )
             for label in tqdm(labels)
         )
     )
+
     throat_props = throat_props[throat_props[:, 2] > 0]
     throat_props[:, 0:2] = np.sort(throat_props[:, 0:2], axis=1)
     connections_unique, connections_indices, connections_count = unique_rows(
@@ -1123,9 +1255,24 @@ def extract_from_image(
         "throat.conns": (throat_props[:, 0:2] - 1).astype(np.int32, copy=False),
         "throat.area": throat_props[:, 2],
     }
-    boundaries_areas_dict = calculate_boundary_area2(labeled_image)
+    boundaries_areas_dict = (
+        calculate_boundary_area(labeled_image) if cubic_boundary_area else {}
+    )
+
+    throat_conns_types, throat_types = generate_throat_types(
+        num_phases, undirected=True
+    )
+    throat_conns = throat_props_dict["throat.conns"]
+    pore_type = np.digitize(pore_props_dict["pore._id"], seps - 1, right=False) - 1
+    throat_conns_type = pore_type[throat_conns]
+
+    throat_type = get_throat_types(
+        throat_conns_type, throat_conns_types, throat_types, sort=False
+    )
 
     multi_net = {}
+    multi_net["pore.type"] = pore_type
+    multi_net["throat.type"] = throat_type
     multi_net["pore._id"] = pore_props_dict["pore._id"]
     num_pore_multi_net = multi_net["pore._id"].size
     multi_net["pore.label"] = multi_net["pore._id"].copy()
@@ -1137,17 +1284,16 @@ def extract_from_image(
     multi_net["pore.radius"] = pore_props_dict["pore.radius"] * resolution
     multi_net["pore.area"] = pore_props_dict["pore.area"] * resolution**2
     multi_net["pore.volume"] = pore_props_dict["pore.volume"] * resolution**3
-    multi_net["pore.void"] = ~multi_net["pore.all"]
-    multi_net["pore.solid"] = ~multi_net["pore.all"]
 
     # add boundary areas
     multi_net["pore.surface_all"] = np.zeros(num_pore_multi_net, dtype=bool)
-    for i, (k, v) in enumerate(boundaries_areas_dict.items()):
-        multi_net[f"pore.surface_{dirs[i]}"] = v.astype(bool)
-        multi_net[f"pore.surface_area_{dirs[i]}"] = v * resolution**2
-        multi_net["pore.surface_all"] = (
-            multi_net["pore.surface_all"] | multi_net[f"pore.surface_{dirs[i]}"]
-        )
+    if cubic_boundary_area:
+        for i, (k, v) in enumerate(boundaries_areas_dict.items()):
+            multi_net[f"pore.surface_{dirs[i]}"] = v.astype(bool)
+            multi_net[f"pore.surface_area_{dirs[i]}"] = v * resolution**2
+            multi_net["pore.surface_all"] = (
+                multi_net["pore.surface_all"] | multi_net[f"pore.surface_{dirs[i]}"]
+            )
 
     multi_net["throat.conns"] = throat_props_dict["throat.conns"]
     multi_net["throat._id"] = np.arange(multi_net["throat.conns"].shape[0])
@@ -1155,8 +1301,6 @@ def extract_from_image(
     num_throat_multi_net = multi_net["throat.conns"].shape[0]
     multi_net["throat.all"] = np.ones(num_throat_multi_net, dtype=bool)
     multi_net["throat.area"] = throat_props_dict["throat.area"] * resolution**2
-    multi_net["throat.solid"] = ~multi_net["throat.all"]
-    multi_net["throat.void"] = ~multi_net["throat.all"]
     multi_net["throat.connect"] = ~multi_net["throat.all"]
     multi_net["throat.length"] = np.linalg.norm(
         multi_net["pore.coords"][multi_net["throat.conns"][:, 0]]
@@ -1198,15 +1342,16 @@ def extract_from_image(
         phase_net["pore.radius"] = multi_net["pore.radius"][sep_start_net:sep_end_net]
         phase_net["pore.area"] = multi_net["pore.area"][sep_start_net:sep_end_net]
         phase_net["pore.volume"] = multi_net["pore.volume"][sep_start_net:sep_end_net]
-        phase_net["pore.void"] = ~phase_net["pore.all"]
-        phase_net["pore.solid"] = ~phase_net["pore.all"]
-        get_surface_from_mpn(
-            mpn_0=phase_net,
-            mpn_1=multi_net,
-            dirs=dirs,
-            start=sep_start_net,
-            end=sep_end_net,
-        )
+        phase_net["pore.type"] = multi_net["pore.type"][sep_start_net:sep_end_net]
+
+        if cubic_boundary_area:
+            get_surface_from_mpn(
+                mpn_0=phase_net,
+                mpn_1=multi_net,
+                dirs=dirs,
+                start=sep_start_net,
+                end=sep_end_net,
+            )
         phase_throat_bool = np.all(
             np.isin(multi_net["throat.conns"], pore__id_o, kind="table"),
             axis=1,
@@ -1221,9 +1366,6 @@ def extract_from_image(
         phase_net["throat._id"] = np.arange(num_throat)
         phase_net["throat.label"] = phase_net["throat._id"].copy()
         phase_net["throat.area"] = multi_net["throat.area"][phase_throat_bool]
-        phase_net["throat.solid"] = ~phase_net["throat.all"]
-        phase_net["throat.void"] = ~phase_net["throat.all"]
-        phase_net["throat.connect"] = ~phase_net["throat.all"]
         phase_net["throat.length"] = multi_net["throat.length"][phase_throat_bool]
         phase_net["throat.total_length"] = multi_net["throat.total_length"][
             phase_throat_bool
@@ -1235,6 +1377,7 @@ def extract_from_image(
         phase_net["throat.real_shape_factor"] = multi_net["throat.real_shape_factor"][
             phase_throat_bool
         ]
+        phase_net["throat.type"] = multi_net["throat.type"][phase_throat_bool]
         nets.append(phase_net)
 
     return nets
@@ -1251,46 +1394,36 @@ def get_label_box(i, phase_props_table, offset=1):
     return index
 
 
-def multi_phase_segmentation(image, config_list, n_workers=1, backend="loky"):
-    pnextract_partial = partial(
-        pnextract,
-        image=image,
-        cut_image=True,
-        check_result=True,
-    )
-    snow_image_segmentation_partial = partial(
-        snow_image_segmentation,
-        image=image,
-        unsegmented_value=-1,
-    )
-    segmentation_funcs = []
-    segmentation_args = []
+def multi_phase_segmentation(
+    image,
+    config_list: list[ConfigPNEC, ConfigSNOW, ConfigPNE],
+    n_workers=1,
+    backend="loky",
+    dtype=np.int32,
+):
+    func_dict = {
+        "pnec": partial(
+            pnec,
+            image=image,
+            cut_image=True,
+            check_result=True,
+        ),
+        "snow": partial(
+            snow_segmentation,
+            image=image,
+            unsegmented_value=-1,
+        ),
+        "pne": partial(
+            pne_segmentation,
+            image=image,
+            cut_image=True,
+        ),
+    }
+
     num_config = len(config_list)
-    for i, config in enumerate(config_list):
-        if "method" not in config:
-            raise ValueError(
-                "method is not provided in the config_dict, valid values are pne and snow"
-            )
-        elif config["method"] == "pne":
-            segmentation_funcs.append(pnextract_partial)
-            segmentation_args.append(
-                {
-                    "target_value": config["target_value"],
-                    "resolution": config["resolution"],
-                    "config_dict": config.get("config_pne"),
-                    "n_workers": config.get("n_workers", 1),
-                }
-            )
-        elif config["method"] == "snow":
-            segmentation_funcs.append(snow_image_segmentation_partial)
-            segmentation_args.append(
-                {
-                    "target_value": config["target_value"],
-                }
-            )
     res_extracted = Parallel(n_jobs=n_workers, backend=backend)(
-        delayed(func)(**args)
-        for func, args in zip(segmentation_funcs, segmentation_args)
+        delayed(func_dict[config.name])(**config.collect_kwargs())
+        for config in config_list
     )
     pns = [
         None,
@@ -1302,10 +1435,12 @@ def multi_phase_segmentation(image, config_list, n_workers=1, backend="loky"):
         None,
     ] * num_config
     for i, res in enumerate(res_extracted):
-        if config_list[i]["method"] == "pne":
+        if config_list[i].name == "pnec":
             pns[i] = res[1]
             images_labeled[i] = res[0]
-        elif config_list[i]["method"] == "snow":
+        elif config_list[i].name == "snow":
+            images_labeled[i] = res
+        elif config_list[i].name == "pne":
             images_labeled[i] = res
 
     # if fill_unlabeled:
@@ -1386,7 +1521,7 @@ def multi_phase_segmentation(image, config_list, n_workers=1, backend="loky"):
         )
         current_phase_max = np.max(image_mixed).astype(np.int32, copy=False)
         seps[i] = current_phase_max + 1
-    seps = [1, *seps]
+    seps = np.array([1, *seps])
     image_mixed = image_mixed.astype(np.int32, copy=False)
     return image_mixed, pns, seps
 
@@ -1398,6 +1533,7 @@ def dualn_phase_extraction(
     n_workers_segmentation=1,
     n_workers_extraction=1,
     backend="loky",
+    area_alg: Literal["mk", "mc"] = "mk",
 ):
     image_mix, nets, seps = multi_phase_extraction(
         image=image,
@@ -1407,6 +1543,7 @@ def dualn_phase_extraction(
         n_workers_segmentation=n_workers_segmentation,
         n_workers_extraction=n_workers_extraction,
         backend=backend,
+        area_alg=area_alg,
     )
     """
     first config is void, second config is solid
@@ -1415,7 +1552,6 @@ def dualn_phase_extraction(
     dualn = nets[0]
     pn = nets[1]
     sn = nets[2]
-    num_pn_pore = pn["pore._id"].size
 
     ## Void Solid Properties
     pn["pore.void"] = pn["pore.all"].copy()
@@ -1429,11 +1565,11 @@ def dualn_phase_extraction(
     sn["throat.void"] = ~sn["throat.all"]
 
     ## Dual Properties
-    dualn["pore.void"][:num_pn_pore] = True
-    dualn["pore.solid"][num_pn_pore:] = True
-    dualn["throat.void"] = np.all(dualn["throat.conns"] < num_pn_pore, axis=1)
-    dualn["throat.solid"] = np.all(dualn["throat.conns"] >= num_pn_pore, axis=1)
-    dualn["throat.connect"] = ~(dualn["throat.void"] | dualn["throat.solid"])
+    dualn["pore.void"] = dualn["pore.type"] == 0
+    dualn["pore.solid"] = dualn["pore.type"] == 1
+    dualn["throat.void"] = dualn["throat.type"] == 0
+    dualn["throat.solid"] = dualn["throat.type"] == 2
+    dualn["throat.connect"] = dualn["throat.type"] == 1
     return image_mix, [dualn, pn, sn], seps
 
 
@@ -1450,55 +1586,24 @@ def get_surface_from_mpn(mpn_0, mpn_1, dirs, start, end):
 def multi_phase_extraction(
     image,
     resolution,
-    config_list,
+    config_list: list[ConfigPNEC, ConfigPNE, ConfigSNOW],
     n_workers_segmentation=1,
     n_workers_extraction=1,
     backend="loky",
+    area_alg: Literal["mk", "mc"] = "mk",
 ):
-    """
-    config_list : a list of configs
-    in each config, there are snow and pne keys
-    if method is pne
-    config = {
-        method: "pne",
-        target_value: value to extract,
-        config_pne: see pypne's documentation for details (default None)
-        pn_mode : Optional[str] "image","origin","origin_image" (default "image")
-            "image" : pores and throats are extracted from image, without using pnextracted classic pore network
-            "origin" : using classic pore network
-            "origin_image" : using classic pore network throat.conns, adjusting pores' properties and throats' properties according to image
-    }
-    if method is snow
-    config = {
-        method: "snow",
-        target_value: value to extract,
-        sigma: float (default 0.4),
-        r_max: float (default None),
-        unsegmented_value: int (default -1)
-    }
-    """
-    pne_config_keys_required = {"target_value"}
-    snow_config_keys_required = {"target_value"}
-    # check config_list
-    for i, config in enumerate(config_list):
-        if "method" not in config:
-            raise ValueError(
-                "method is not provided in the config_dict, valid values are pne and snow"
-            )
-        elif config["method"] == "pne":
-            keys_lack = pne_config_keys_required - set(config.keys())
-            if config.get("resolution", None) is not None:
-                print(
-                    "Warning:resolution of pne is not used in multi_phase_extraction, using resolution of function argument"
-                )
-            config["resolution"] = resolution
 
-            if keys_lack:
-                raise ValueError(f"config_dict[{i}] lacks keys {keys_lack}")
-        elif config["method"] == "snow":
-            keys_lack = snow_config_keys_required - set(config.keys())
-            if keys_lack:
-                raise ValueError(f"config_dict[{i}] lacks keys {keys_lack}")
+    config_list = list(config_list)
+    for config in config_list:
+        if config.name == "pnec":
+            if config.resolution:
+                if config.resolution != resolution:
+                    print(
+                        f"Warning: resolution is set to {resolution} instead of {config.resolution}"
+                    )
+                    config.resolution = resolution
+            else:
+                config.resolution = resolution
 
     image_mixed, pns_pne, seps = multi_phase_segmentation(
         image=image,
@@ -1506,9 +1611,6 @@ def multi_phase_extraction(
         n_workers=n_workers_segmentation,
         backend=backend,
     )
-    import time
-
-    t0 = time.time()
     nets = extract_from_image(
         labeled_image=image_mixed,
         resolution=resolution,
@@ -1516,12 +1618,12 @@ def multi_phase_extraction(
         seps=seps,
         n_workers=n_workers_extraction,
         backend=backend,
+        area_alg=area_alg,
     )
     net_mixed = nets[0]
     for i, config in enumerate(config_list):
-        if config["method"] == "pne":
-            pn_mode = config.get("pn_mode", "image")
-            if pn_mode == "image":
+        if config.name == "pnec":
+            if config.pn_mode == "image":
                 pass
             else:
                 # origin pn
@@ -1544,16 +1646,16 @@ def multi_phase_extraction(
                 for key in net_mixed.keys():
                     net_mixed[key] = net_mixed[key][throat_bool]
 
-                if pn_mode == "origin":
+                if config.pn_mode == "origin":
                     for key in net_mixed.keys():
                         if key.startswith("pore."):
                             net_mixed[key][pore__id] = net_pne[key]
-                        if key.startswith("throat."):
+                        elif key.startswith("throat."):
                             net_mixed[key] = np.concatenate(
                                 (net_mixed[key], net_pne[key]), axis=0
                             )
 
-                elif pn_mode == "origin_image":
+                elif config.pn_mode == "origin_image":
                     throat_map = find_throat_conns_map(
                         net_pne["throat.conns"], net_mixed["throat.conns"]
                     )
@@ -1562,12 +1664,12 @@ def multi_phase_extraction(
                     for key in net_pne.keys():
                         if key.startswith("pore."):
                             net_pne[key] = net_mixed[key][pore__id]
-                        if key.startswith("throat."):
+                        elif key.startswith("throat."):
                             net_pne[key][throat_0] = net_mixed[key][throat_1]
                     for key in net_mixed.keys():
                         if key.startswith("pore."):
                             net_mixed[key][pore__id] = net_pne[key]
-                        if key.startswith("throat."):
+                        elif key.startswith("throat."):
                             net_mixed[key] = np.concatenate(
                                 (net_mixed[key], net_pne[key]), axis=0
                             )
@@ -1579,3 +1681,8 @@ def multi_phase_extraction(
                     nets[0] = net_mixed
                     nets[i + 1] = net_pne
     return image_mixed, nets, seps
+
+
+if __name__ == "__main__":
+    ConfigSNOW(target_value=0, unsegmented_value=-1)
+    print(ConfigSNOW.func_args)
